@@ -11,3 +11,12 @@ build:macos --workspace_status_command=infra/get_workspace_status
 
 test --test_summary=testcase
 test --test_output=errors
+
+# These settings should be enabled whenever bazel is running in an automated
+# context
+build:noninteractive --color=yes
+build:noninteractive --curses=no
+build:noninteractive --show_timestamps
+build:noninteractive --announce_rc
+build:noninteractive --test_output=summary
+build:noninteractive --keep_going

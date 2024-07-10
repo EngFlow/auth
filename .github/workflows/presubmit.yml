@@ -1,0 +1,38 @@
+# Presubmit checks for PRs
+name: "presubmit"
+
+on:
+  # Trigger on pull request rather than push, so that we can control whether
+  # checks are run on a given PR (allowing checks to run automatically on PR
+  # updates from third parties can be a security issue).
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}.${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bazel-builder:
+    # TODO(scott): Move to CI runners
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: run all tests
+        run: |
+          bazel test --config=noninteractive //...
+
+  golang-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: build all
+        run: |
+          go build ./...
+      - name: run all tests
+        run: |
+          go test ./...
