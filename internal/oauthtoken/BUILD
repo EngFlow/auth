@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "oauthtoken",
@@ -10,12 +10,12 @@ go_library(
         "load_storer.go",
     ],
     importpath = "github.com/EngFlow/auth/internal/oauthtoken",
-    visibility = ["//third_party/engflow_auth:__subpackages__"],
+    visibility = ["//:__subpackages__"],
     deps = [
-        "//third_party/engflow_auth/internal/autherr",
-        "//third_party/go/github.com/golang-jwt/jwt/v5:jwt",
-        "//third_party/go/github.com/zalando/go-keyring",
-        "//third_party/go/golang.org/x/oauth2",
+        "//internal/autherr",
+        "@com_github_golang_jwt_jwt_v5//:go_default_library",
+        "@com_github_zalando_go_keyring//:go_default_library",
+        "@org_golang_x_oauth2//:go_default_library",
     ],
 )
 
@@ -28,12 +28,12 @@ go_test(
     ],
     embed = [":oauthtoken"],
     deps = [
-        "//third_party/engflow_auth/internal/autherr",
-        "//third_party/go/github.com/golang-jwt/jwt/v5:jwt",
-        "//third_party/go/github.com/google/uuid",
-        "//third_party/go/github.com/stretchr/testify/assert",
-        "//third_party/go/github.com/stretchr/testify/require",
-        "//third_party/go/github.com/zalando/go-keyring",
-        "//third_party/go/golang.org/x/oauth2",
+        "//internal/autherr",
+        "@com_github_golang_jwt_jwt_v5//:go_default_library",
+        "@com_github_google_uuid//:go_default_library",
+        "@com_github_stretchr_testify//assert:go_default_library",
+        "@com_github_stretchr_testify//require:go_default_library",
+        "@com_github_zalando_go_keyring//:go_default_library",
+        "@org_golang_x_oauth2//:go_default_library",
     ],
 )

@@ -192,7 +192,7 @@ Visit %s for help.`,
 }
 
 func (r *rootCmd) version(ctx context.Context, args []string) error {
-	fmt.Fprintf(r.stdout, "%s", buildstamp.Values)
+	fmt.Fprintf(r.stdout, "%s\n", buildstamp.Values)
 	return nil
 }
 

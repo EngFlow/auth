@@ -97,7 +97,7 @@ func lookupBuildSetting(info *debug.BuildInfo, name string) (string, bool) {
 
 func (v Vars) String() string {
 	if v == emptyValues {
-		return "build metadata is unavailable (build with bazel's `--stamp` flag to enable"
+		return "build metadata is unavailable (build with bazel's `--stamp` flag to enable)"
 	}
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "build time: %v\n", v.BuildTimestamp)
