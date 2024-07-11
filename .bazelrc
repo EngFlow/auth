@@ -20,3 +20,6 @@ build:noninteractive --show_timestamps
 build:noninteractive --announce_rc
 build:noninteractive --test_output=summary
 build:noninteractive --keep_going
+
+build:release --config=noninteractive
+build:release --stamp

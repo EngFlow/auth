@@ -1,0 +1,31 @@
+name: "release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        type: string
+        description: Version of engflow_auth to release; must be a semver version string, starting with `v`
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on:
+      - self-hosted
+      - os=linux
+      - arch=x64
+      - os_distribution=debian
+      - os_version=12
+      - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: release
+        run: |
+          infra/release.sh "${{ github.events.inputs.version }}"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
