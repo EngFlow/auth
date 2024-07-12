@@ -9,26 +9,48 @@ on:
 concurrency:
   group: ${{ github.workflow }}.${{ github.ref }}
 
+# Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
+env:
+  BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  OPAL_RPC_CREDENTIALS: ${{ secrets.OPAL_RPC_CREDENTIALS }}
+
 jobs:
-  bazel-builder:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
+  test-matrix:
+    runs-on:
+      - self-hosted
+      - "os=${{ matrix.os }}"
+      - "arch=${{ matrix.arch }}"
+      - "os_distribution=${{ matrix.os_distribution }}"
+      - "os_version=${{ matrix.os_version }}"
+      - "revision=${{ matrix.revision }}"
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: "linux"
+            arch: "x64"
+            os_distribution: "debian"
+            os_version: "12"
+            revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
+
+          - os: "macos"
+            arch: "x64"
+            os_distribution: "monterey"
+            os_version: "12"
+            revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
+
+          - os: "windows"
+            arch: "x64"
+            os_distribution: "debian"
+            os_version: "12"
+            revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
 
     steps:
       - uses: actions/checkout@v4
-      - name: run all tests
+
+      - name: Test with Bazel
         run: |
+          # TODO(CUS-345): Enable remote execution
           bazel test --config=noninteractive //...
-
-  golang-builder:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: build all
-        run: |
-          go build ./...
-      - name: run all tests
-        run: |
-          go test ./...
