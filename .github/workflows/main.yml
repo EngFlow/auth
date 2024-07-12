@@ -1,0 +1,34 @@
+# Postsubmit checks that run on the `main` branch after merge.
+name: "main"
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}.${{ github.ref }}
+
+jobs:
+  bazel-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: run all tests
+        run: |
+          bazel test --config=noninteractive //...
+
+  golang-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: build all
+        run: |
+          go build ./...
+      - name: run all tests
+        run: |
+          go test ./...
