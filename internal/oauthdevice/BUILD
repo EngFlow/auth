@@ -5,5 +5,5 @@ go_library(
     srcs = ["authenticator.go"],
     importpath = "github.com/EngFlow/auth/internal/oauthdevice",
     visibility = ["//:__subpackages__"],
-    deps = ["@org_golang_x_oauth2//:go_default_library"],
+    deps = ["@org_golang_x_oauth2//:oauth2"],
 )

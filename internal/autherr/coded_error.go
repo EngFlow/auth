@@ -3,6 +3,8 @@ package autherr
 import (
 	"errors"
 	"fmt"
+
+	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -15,24 +17,12 @@ const (
 	CodeReauthRequired    = 7
 )
 
-var UnexpectedHTML = errors.New("request to JSON API returned HTML unexpectedly")
+var ErrUnexpectedHTML = errors.New("request to JSON API returned HTML unexpectedly")
 
 // CodedError wraps an error with an integer code that can be used as e.g. a
 // return code from an application.
-type CodedError struct {
-	Code int
-	Err  error
-}
-
-func (e *CodedError) Error() string {
-	return e.Err.Error()
-}
-
 func CodedErrorf(code int, format string, args ...any) error {
-	return &CodedError{
-		Code: code,
-		Err:  fmt.Errorf(format, args...),
-	}
+	return cli.Exit(fmt.Errorf(format, args...), code)
 }
 
 func ReauthRequired(cluster string) error {

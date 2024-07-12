@@ -15,6 +15,7 @@ import (
 	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/stretchr/testify/assert"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/oauth2"
 )
 
@@ -48,15 +49,15 @@ func codedErrorContains(t *testing.T, gotErr error, code int, wantMsg string) bo
 		}
 	}
 
-	coded := &autherr.CodedError{}
+	var coded cli.ExitCoder
 	if !errors.As(gotErr, &coded) {
 		assert.Fail(t, "failed to unwrap to CodedError", "error of type %T does not wrap a %T", gotErr, coded)
 		return false
 	}
-	if !assert.Equal(t, code, coded.Code) {
+	if !assert.Equal(t, code, coded.ExitCode()) {
 		return false
 	}
-	if !assert.Contains(t, coded.Err.Error(), wantMsg) {
+	if !assert.Contains(t, coded.Error(), wantMsg) {
 		return false
 	}
 	return true
@@ -292,7 +293,7 @@ func TestRun(t *testing.T) {
 				res: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
-				fetchCodeErr: autherr.UnexpectedHTML,
+				fetchCodeErr: autherr.ErrUnexpectedHTML,
 			},
 			wantCode: autherr.CodeAuthFailure,
 			wantErr:  "This cluster may not support 'engflow_auth login'.\nVisit https://cluster.example.com/gettingstarted for help.",
@@ -340,6 +341,12 @@ func TestRun(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			oldExitFunc := cli.OsExiter
+			defer func() {
+				cli.OsExiter = oldExitFunc
+			}()
+			cli.OsExiter = func(int) {}
+
 			ctx := context.Background()
 			stdout := bytes.NewBuffer(nil)
 			stderr := bytes.NewBuffer(nil)
@@ -365,7 +372,7 @@ func TestRun(t *testing.T) {
 				root.tokenStore = &fakeStore{}
 			}
 
-			gotErr := root.run(ctx, tc.args)
+			gotErr := root.run(ctx, append([]string{"engflow_auth"}, tc.args...))
 
 			codedErrorContains(t, gotErr, tc.wantCode, tc.wantErr)
 

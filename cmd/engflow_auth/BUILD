@@ -11,8 +11,9 @@ go_library(
         "//internal/buildstamp",
         "//internal/oauthdevice",
         "//internal/oauthtoken",
-        "@com_github_engflow_credential_helper_go//:go_default_library",
-        "@org_golang_x_oauth2//:go_default_library",
+        "@com_github_engflow_credential_helper_go//:credential-helper-go",
+        "@com_github_urfave_cli_v2//:cli",
+        "@org_golang_x_oauth2//:oauth2",
     ],
 )
 
@@ -31,8 +32,9 @@ go_test(
         "//internal/browser",
         "//internal/oauthdevice",
         "//internal/oauthtoken",
-        "@com_github_stretchr_testify//assert:go_default_library",
-        "@org_golang_x_oauth2//:go_default_library",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_urfave_cli_v2//:cli",
+        "@org_golang_x_oauth2//:oauth2",
     ],
 )
 
