@@ -20,3 +20,40 @@ build:noninteractive --show_timestamps
 build:noninteractive --announce_rc
 build:noninteractive --test_output=summary
 build:noninteractive --keep_going
+
+# Platform-specific options for each supported platform.
+build:remote_linux_x64 --extra_execution_platforms=//platform/linux_x64
+build:remote_linux_x64 --host_platform=//platform/linux_x64
+build:remote_linux_x64 --platforms=//platform/linux_x64
+build:remote_linux_x64 --extra_toolchains=//platform/linux_x64:cc-toolchain
+
+build:remote_macos_x64 --extra_execution_platforms=//platform/macos_x64
+build:remote_macos_x64 --host_platform=//platform/macos_x64
+build:remote_macos_x64 --platforms=//platform/macos_x64
+build:remote_macos_x64 --macos_minimum_os=12
+build:remote_macos_x64 --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:remote_macos_x64 --host_action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+
+# Options for EngFlow remote execution.
+build:engflow_common --jobs=40
+build:engflow_common --define=EXECUTOR=remote
+build:engflow_common --disk_cache=
+build:engflow_common --experimental_inmemory_dotd_files
+build:engflow_common --experimental_inmemory_jdeps_files
+build:engflow_common --incompatible_strict_action_env=true
+build:engflow_common --remote_timeout=3600
+build:engflow_common --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:engflow_common --java_runtime_version=remotejdk_11
+build:engflow_common --java_language_version=11
+build:engflow_common --grpc_keepalive_time=30s
+build:engflow_common --legacy_important_outputs=false
+
+build:opal --config=engflow_common
+build:opal --config=opal_auth
+build:opal --bes_backend=grpcs://opal.cluster.engflow.com
+build:opal --bes_results_url=https://opal.cluster.engflow.com/invocations/default/
+build:opal --remote_executor=grpcs://opal.cluster.engflow.com
+
+# To authenticate with the clusters above, create a .bazelrc.user file.
+# This file is not checked into Git because it refers to local file system paths.
+try-import .bazelrc.user
