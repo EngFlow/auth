@@ -16,7 +16,25 @@ env:
   OPAL_RPC_CREDENTIALS: ${{ secrets.OPAL_RPC_CREDENTIALS }}
 
 jobs:
-  test-matrix:
+  bazel-builder:
+    runs-on:
+      - self-hosted
+      - os=linux
+      - arch=x64
+      - os_distribution=debian
+      - os_version=12
+      - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run all tests
+        run: |
+          # TODO(CUS-345): Enable remote execution
+          bazel test --config=noninteractive //...
+
+  golang-builder:
     runs-on:
       - self-hosted
       - "os=${{ matrix.os }}"
@@ -50,7 +68,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Test with Bazel
+      - name: Run all tests
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel test --config=noninteractive //...
+          bazel run --config=noninteractive @rules_go//go -- test ./...
+          bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
