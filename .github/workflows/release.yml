@@ -26,6 +26,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: release
         run: |
-          infra/release.sh "${{ github.events.inputs.version }}"
+          infra/release.sh "${{ inputs.version }}"
         env:
           GITHUB_TOKEN: ${{ github.token }}
