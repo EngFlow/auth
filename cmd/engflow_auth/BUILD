@@ -1,4 +1,5 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library", "go_test")
+load("//infra:visibility.bzl", "RELEASE_ARTIFACT")
 
 go_library(
     name = "engflow_auth_lib",
@@ -40,16 +41,19 @@ go_cross_binary(
     name = "engflow_auth_macos_arm64",
     platform = "@rules_go//go/toolchain:darwin_arm64_cgo",
     target = ":engflow_auth",
+    visibility = RELEASE_ARTIFACT,
 )
 
 go_cross_binary(
     name = "engflow_auth_windows_x64",
     platform = "@rules_go//go/toolchain:windows_amd64_cgo",
     target = ":engflow_auth",
+    visibility = RELEASE_ARTIFACT,
 )
 
 go_cross_binary(
     name = "engflow_auth_linux_x64",
     platform = "@rules_go//go/toolchain:linux_amd64_cgo",
     target = ":engflow_auth",
+    visibility = RELEASE_ARTIFACT,
 )
