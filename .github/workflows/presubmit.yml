@@ -49,10 +49,12 @@ jobs:
             os_version: "12"
             revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
 
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Test with Bazel
-        run: |
-          # TODO(CUS-345): Enable remote execution
-          bazel test --config=noninteractive //...
+      - name: Run all tests
+        run: infra/test.sh

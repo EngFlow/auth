@@ -33,6 +33,7 @@ toolchain(
 
 cc_toolchain_suite(
     name = "toolchain",
+    tags = ["manual"],
     toolchains = {
         "k8|gcc": ":cc-compiler-k8",
         "k8": ":cc-compiler-k8",
