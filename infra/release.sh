@@ -14,19 +14,26 @@ readonly RELEASE_VERSION="$1"
 readonly GH_CLI_URL='https://storage.googleapis.com/engflow-tools-public/github.com/cli/cli/releases/download/v2.52.0/gh_2.52.0_linux_amd64.tar.gz'
 readonly GH_CLI_EXPECTED_SHA256='3ea6ed8b2585f406a064cecd7e1501e58f56c8e7ca764ae1f3483d1b8ed68826'
 
-# Check that supplied version string follows semver
+echo "[START]  Release name checks"
+# Supplied version string must follow semver
 if ! grep --quiet --extended-regexp "${SEMVER_REGEX}" <<<${RELEASE_VERSION}; then
   echo "Supplied version string '${RELEASE_VERSION}' does not follow semver; exiting"
   exit 1
 fi
+echo "[FINISH] Release name checks"
 
 function cleanup {
+  echo "[START]  Temp directory cleanup"
+  rm -rf "${ARTIFACTS_DIR}"
   rm -rf "${GH_CLI_DIR}"
+  echo "[FINISH] Temp directory cleanup"
 }
 
-# Download and verify Github CLI
+ARTIFACTS_DIR="$(mktemp -d -t 'engflow_auth_release_XXXXXXXX')"
+
 # TODO(CUS-353): Remove this after installing Github CLI in the self-hosted
 # environment (run via Docker?)
+echo "[START]  Downloading gh CLI"
 readonly GH_CLI_DIR="$(mktemp -d -t 'gh_cli_XXXXXXXX')"
 curl --silent --location "${GH_CLI_URL}" \
   | tee >(sha256sum - > "${GH_CLI_DIR}/archive_checksum.txt") \
@@ -42,8 +49,10 @@ if [[ "${GH_CLI_ACTUAL_SHA256}" != "${GH_CLI_EXPECTED_SHA256}" ]]; then
     echo "SHA256 for Github CLI tarball ${GH_CLI_ACTUAL_SHA256} doesn't match expected value ${GH_CLI_ACTUAL_SHA256}; exiting"
     exit 1
 fi
+echo "[FINISH] Downloading gh CLI"
 
-# Check that the current commit is on either `main` or a release branch
+echo "[START]  Release branch checks"
+# Current commit must be on either `main` or the corresponding release branch
 readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(v[0-9]+.[0-9]+).[0-9]+|release/\1|' <<<${RELEASE_VERSION})"
 if ! git branch \
   --contains "$(git rev-parse HEAD)" \
@@ -51,17 +60,47 @@ if ! git branch \
     echo "Commit $(git rev-parse HEAD) is not on main or release branch ${EXPECTED_RELEASE_BRANCH}; exiting"
     exit 1
 fi
+echo "[FINISH] Release branch checks"
 
 # Build release artifacts
+echo "[START]  Building artifacts"
 bazel build \
     --config=release \
     -- \
     //:release_artifacts
+echo "[FINISH] Building artifacts"
+
+# Stage release artifacts - this works around an artifact naming uniqueness
+# issue with Github release artifacts. Namely - once we follow bazel symlinks
+# (e.g. via `realpath`, because gh CLI won't follow symlinks), binaries for UNIX
+# platforms will have the same basename. Github will infer an artifact name from
+# basename, and require these inferred names to be unique. Staging in a
+# directory allows us to manually ensure basename uniqueness.
+#
+# This is brittle w.r.t. adding new artifacts; if we can find a smarter way to
+# build artifacts with unique basenames under bazel-bin after symlink
+# resolution, we may be able to drop this staging step and the corresponding
+# temp dir.
+echo "[START]  Staging artifacts"
+cp \
+  bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_linux_x64 \
+  "${ARTIFACTS_DIR}/engflow_auth_linux_x64"
+
+cp \
+  bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_macos_arm64 \
+  "${ARTIFACTS_DIR}/engflow_auth_macos_arm64"
+
+cp \
+  bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_windows_x64 \
+  "${ARTIFACTS_DIR}/engflow_auth_windows_x64"
+echo "[FINISH] Staging artifacts"
 
 # Create release
+echo "[START]  Creating release"
 ${GH_CLI} release create \
-    "v${RELEASE_VERSION}" \
+    "${RELEASE_VERSION}" \
     --generate-notes \
-    "$(realpath bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_linux_x64)#engflow_auth (Linux, x64)" \
-    "$(realpath bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_macos_arm64)#engflow_auth (macOS, arm64)" \
-    "$(realpath bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_windows_x64)#engflow_auth (Windows, x64)"
+    "${ARTIFACTS_DIR}/engflow_auth_linux_x64#engflow_auth (Linux, x64)" \
+    "${ARTIFACTS_DIR}/engflow_auth_macos_arm64#engflow_auth (macOS, arm64)" \
+    "${ARTIFACTS_DIR}/engflow_auth_windows_x64#engflow_auth (Windows, x64)"
+echo "[FINISH] Creating release"
