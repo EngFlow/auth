@@ -21,6 +21,9 @@ build:noninteractive --announce_rc
 build:noninteractive --test_output=summary
 build:noninteractive --keep_going
 
+build:release --config=noninteractive
+build:release --stamp
+
 # Platform-specific options for each supported platform.
 build:remote_linux_x64 --extra_execution_platforms=//platform/linux_x64
 build:remote_linux_x64 --host_platform=//platform/linux_x64
