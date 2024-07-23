@@ -5,6 +5,7 @@ package buildstamp
 
 import (
 	"fmt"
+	"regexp"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -22,9 +23,8 @@ type Vars struct {
 const (
 	unknown = "<unknown>"
 
-	gitStatusClean    = "clean"
-	gitStatusDirty    = "modified"
-	gitOfficialBranch = "master"
+	gitStatusClean = "clean"
+	gitStatusDirty = "modified"
 )
 
 var (
@@ -35,6 +35,8 @@ var (
 
 	Values      Vars
 	emptyValues Vars
+
+	gitOfficialBranchRe = regexp.MustCompile(`main|release/v[0-9]+\.[0-9]+`)
 )
 
 func init() {
@@ -78,7 +80,7 @@ func init() {
 		Values.SourceBranch = gitBranch
 		Values.SourceRevision = gitSha
 		Values.IsClean = gitSourceTreeStatus == gitStatusClean
-		Values.IsOfficial = gitSourceTreeStatus == gitStatusClean && gitBranch == gitOfficialBranch
+		Values.IsOfficial = gitSourceTreeStatus == gitStatusClean && gitOfficialBranchRe.Match([]byte(gitBranch))
 
 		if ts, err := strconv.ParseInt(buildTimestamp, 10, 64); err == nil {
 			Values.BuildTimestamp = time.Unix(ts, 0)
