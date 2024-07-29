@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -336,6 +337,83 @@ func TestRun(t *testing.T) {
 			},
 			wantCode: autherr.CodeTokenStoreFailure,
 			wantErr:  "token_store_fail",
+		},
+		{
+			desc:     "export with no args",
+			args:     []string{"export"},
+			wantCode: autherr.CodeBadParams,
+			wantErr:  "expected exactly 1 positional argument",
+		},
+		{
+			desc:     "export with invalid cluster URL",
+			args:     []string{"export", "grpcs://cluster.example.com:8080"},
+			wantCode: autherr.CodeBadParams,
+			wantErr:  "illegal scheme",
+		},
+		{
+			desc: "export when token not found",
+			args: []string{"export", "https://cluster.example.com"},
+			tokenStore: &fakeStore{
+				loadToken: nil,
+				loadErr:   autherr.ReauthRequired("https://cluster.example.com"),
+			},
+			wantCode: autherr.CodeReauthRequired,
+			wantErr:  "expired credentials for cluster",
+		},
+		{
+			desc: "export when token store fails",
+			args: []string{"export", "https://cluster.example.com"},
+			tokenStore: &fakeStore{
+				loadToken: nil,
+				loadErr:   fmt.Errorf("token_load_error"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+			wantErr:  "token_load_error",
+		},
+		{
+			desc: "export when token expired",
+			args: []string{"export", "https://cluster.example.com"},
+			tokenStore: &fakeStore{
+				loadToken: &oauth2.Token{
+					AccessToken: "access_token",
+					Expiry:      time.Date(2024, 1, 2, 3, 4, 5, 6, time.UTC),
+				},
+			},
+			wantCode: autherr.CodeReauthRequired,
+			wantErr:  "Please refresh credentials",
+		},
+		{
+			desc: "export token",
+			args: []string{"export", "https://cluster.example.com"},
+			tokenStore: &fakeStore{
+				loadToken: &oauth2.Token{
+					AccessToken: "token_data",
+					Expiry:      expiresInFuture,
+				},
+				loadErr: nil,
+			},
+			wantStdoutContaining: []string{
+				`{"token":{"access_token":"token_data",`, // Should have top-level token element
+				`,"expiry":"`,                            // Should have token expiry
+				`,"cluster_host":"cluster.example.com"`,  // Should have hostname
+			},
+		},
+		{
+			desc: "export token with alias",
+			args: []string{"export", "--alias", "cluster.local.example.com:8080", "https://cluster.example.com"},
+			tokenStore: &fakeStore{
+				loadToken: &oauth2.Token{
+					AccessToken: "token_data",
+					Expiry:      expiresInFuture,
+				},
+				loadErr: nil,
+			},
+			wantStdoutContaining: []string{
+				`{"token":{"access_token":"token_data",`,        // Should have top-level token element
+				`,"expiry":"`,                                   // Should have token expiry
+				`,"cluster_host":"cluster.example.com"`,         // Should have hostname
+				`,"aliases":["cluster.local.example.com:8080"]`, // Should have aliases
+			},
 		},
 	}
 	for _, tc := range testCases {
