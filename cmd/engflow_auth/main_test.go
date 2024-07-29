@@ -50,7 +50,7 @@ func codedErrorContains(t *testing.T, gotErr error, code int, wantMsg string) bo
 
 	coded := &autherr.CodedError{}
 	if !errors.As(gotErr, &coded) {
-		assert.Fail(t, "failed to unwrap to CodedError", "error of type %T does not wrap a %T", gotErr, coded)
+		assert.Fail(t, "failed to unwrap to CodedError", "error of type %T does not wrap a %T. Full error: %v", gotErr, coded, gotErr)
 		return false
 	}
 	if !assert.Equal(t, code, coded.Code) {
@@ -192,11 +192,11 @@ func TestRun(t *testing.T) {
 		{
 			desc: "help returns no error",
 			args: []string{"help"},
-			wantStderrContaining: []string{
+			wantStdoutContaining: []string{
 				"get",
 				"version",
 				"help",
-				"login <CLUSTER_URL>",
+				"login",
 			},
 		},
 		{
@@ -344,16 +344,10 @@ func TestRun(t *testing.T) {
 			stdout := bytes.NewBuffer(nil)
 			stderr := bytes.NewBuffer(nil)
 
-			root := &rootCmd{
+			root := &appState{
 				browserOpener: tc.browserOpener,
 				authenticator: tc.authenticator,
 				tokenStore:    tc.tokenStore,
-				stdin:         tc.machineInput,
-				stdout:        stdout,
-				stderr:        stderr,
-			}
-			if root.stdin == nil {
-				root.stdin = strings.NewReader("")
 			}
 			if root.browserOpener == nil {
 				root.browserOpener = &fakeBrowser{}
@@ -365,25 +359,41 @@ func TestRun(t *testing.T) {
 				root.tokenStore = &fakeStore{}
 			}
 
-			gotErr := root.run(ctx, tc.args)
+			app := makeApp(root)
+
+			// Fake out stdin/stdout/stderr
+			app.Reader = tc.machineInput
+			if app.Reader == nil {
+				app.Reader = strings.NewReader("")
+			}
+			app.Writer = stdout
+			app.ErrWriter = stderr
+
+			// Run the app with a bogus argv[0] that shouldn't affect behavior,
+			// but allows CLI parsing to happen as expected.
+			gotErr := app.RunContext(ctx, append([]string{"engflow_auth_test"}, tc.args...))
 
 			codedErrorContains(t, gotErr, tc.wantCode, tc.wantErr)
 
 			for _, wantOutput := range tc.wantStdoutContaining {
-				assert.Contains(
+				if !assert.Contains(
 					t,
 					stdout.String(),
 					wantOutput,
 					"stdout doesn't contain expected output",
-				)
+				) {
+					t.Logf("\n====== BEGIN APP STDOUT ======\n%s\n====== END APP STDOUT ======\n\n", stdout.String())
+				}
 			}
 			for _, wantOutput := range tc.wantStderrContaining {
-				assert.Contains(
+				if !assert.Contains(
 					t,
 					stderr.String(),
 					wantOutput,
 					"stderr doesn't contain expected output",
-				)
+				) {
+					t.Logf("\n====== BEGIN APP STDERR ======\n%s\n====== END APP STDERR ======\n\n", stderr.String())
+				}
 			}
 			if tokenStore, ok := tc.tokenStore.(*fakeStore); ok {
 				assert.Subset(t, tokenStore.storeClusters, tc.wantStoreCallsFor)

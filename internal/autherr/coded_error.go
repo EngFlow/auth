@@ -28,6 +28,10 @@ func (e *CodedError) Error() string {
 	return e.Err.Error()
 }
 
+func (e *CodedError) ExitCode() int {
+	return e.Code
+}
+
 func CodedErrorf(code int, format string, args ...any) error {
 	return &CodedError{
 		Code: code,

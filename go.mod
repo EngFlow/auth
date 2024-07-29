@@ -7,6 +7,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.9.0
+	github.com/urfave/cli/v2 v2.27.2
 	github.com/zalando/go-keyring v0.2.5
 	golang.org/x/oauth2 v0.20.0
 )
@@ -19,7 +20,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/urfave/cli/v2 v2.27.2 // indirect
 	github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

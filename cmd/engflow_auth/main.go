@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
-	"io"
 	"net"
 	"net/url"
 	"os"
@@ -19,6 +17,7 @@ import (
 	"github.com/EngFlow/auth/internal/buildstamp"
 	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
+	"github.com/urfave/cli/v2"
 
 	credentialhelper "github.com/EngFlow/credential-helper-go"
 	"golang.org/x/oauth2"
@@ -30,50 +29,20 @@ const (
 	cliClientID = "69a59a782cbce2a1bda9d6e643a20e0c08f630fbf0d960674376a70f0b1942a9"
 )
 
-func showHelp(stream io.Writer) {
-	fmt.Fprintf(stream, `engflow_auth: Manage authentication to engflow clusters
-
-Commands:
-
-	get
-		Reads a Bazel credential helper request JSON payload from stdin and
-		responds with a Bazel credential helper response JSON payload over
-		stdout.
-
-		This command should only be used by tools that understand the Bazel
-		credential helper protocol.
-
-	help
-		Shows this info.
-
-	login <CLUSTER_URL>
-		Initiates an interactive OAuth flow to log into the cluster at
-		CLUSTER_URL.
-
-		Example:
-
-			engflow_auth login example.cluster.engflow.com
-
-	version
-		Prints version information.
-`)
-}
-
-type rootCmd struct {
+type appState struct {
 	browserOpener browser.Opener
 	authenticator oauthdevice.Authenticator
 	tokenStore    oauthtoken.LoadStorer
-	stdin         io.Reader
-	stdout        io.Writer
-	stderr        io.Writer
 }
 
-func (r *rootCmd) get(ctx context.Context, args []string) error {
-	if len(args) != 0 {
-		return autherr.CodedErrorf(autherr.CodeBadParams, "expected no positional args; got %d args: %v", len(args), args)
+func (r *appState) get(cliCtx *cli.Context) error {
+	ctx := cliCtx.Context
+
+	if cliCtx.NArg() != 0 {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "expected no positional args; got %d args: %v", cliCtx.NArg(), cliCtx.Args())
 	}
 	var req credentialhelper.GetCredentialsRequest
-	if err := json.NewDecoder(r.stdin).Decode(&req); err != nil {
+	if err := json.NewDecoder(cliCtx.App.Reader).Decode(&req); err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to parse GetCredentialsRequest: %w", err)
 	}
 	clusterURL, err := url.Parse(req.URI)
@@ -94,27 +63,19 @@ func (r *rootCmd) get(ctx context.Context, args []string) error {
 		},
 		Expires: &token.Expiry,
 	}
-	if err := json.NewEncoder(r.stdout).Encode(res); err != nil {
+	if err := json.NewEncoder(cliCtx.App.Writer).Encode(res); err != nil {
 		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to marshal GetCredentialsResponse to JSON: %w", err)
 	}
 	return nil
 }
 
-func (r *rootCmd) login(ctx context.Context, args []string) error {
-	flags := flag.NewFlagSet("login", flag.ContinueOnError)
-	aliasFlag := flags.String("alias", "", "Comma-separated list of alias hostnames for this cluster")
-	if err := flags.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			showHelp(r.stderr)
-			return nil
-		}
-		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to process flags for `login`: %w", err)
-	}
+func (r *appState) login(cliCtx *cli.Context) error {
+	ctx := cliCtx.Context
 
-	if flags.NArg() != 1 {
+	if cliCtx.NArg() != 1 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster name")
 	}
-	clusterURL, err := sanitizedURL(flags.Arg(0))
+	clusterURL, err := sanitizedURL(cliCtx.Args().Get(0))
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
@@ -123,13 +84,11 @@ func (r *rootCmd) login(ctx context.Context, args []string) error {
 	// Tokens fetched during the process will be associated with each URL in
 	// storeURLs in the token store
 	storeURLs := []*url.URL{clusterURL}
-	if *aliasFlag != "" {
-		for _, alias := range strings.Split(*aliasFlag, ",") {
-			if aliasURL, err := sanitizedURL(alias); err != nil {
-				return autherr.CodedErrorf(autherr.CodeBadParams, "invalid alias host: %w", err)
-			} else {
-				storeURLs = append(storeURLs, aliasURL)
-			}
+	for _, alias := range cliCtx.StringSlice("alias") {
+		if aliasURL, err := sanitizedURL(alias); err != nil {
+			return autherr.CodedErrorf(autherr.CodeBadParams, "invalid alias host: %w", err)
+		} else {
+			storeURLs = append(storeURLs, aliasURL)
 		}
 	}
 
@@ -183,7 +142,7 @@ Visit %s for help.`,
 	}
 
 	fmt.Fprintf(
-		r.stderr,
+		cliCtx.App.ErrWriter,
 		"Successfully saved credentials for %[1]s.\nTo use, ensure the line below is in your .bazelrc:\n\n\tbuild --credential_helper=%[1]s=%s\n",
 		clusterURL.Hostname(),
 		os.Args[0])
@@ -191,37 +150,63 @@ Visit %s for help.`,
 	return nil
 }
 
-func (r *rootCmd) version(ctx context.Context, args []string) error {
-	fmt.Fprintf(r.stdout, "%s\n", buildstamp.Values)
+func (r *appState) version(cliCtx *cli.Context) error {
+	fmt.Fprintf(cliCtx.App.Writer, "%s\n", buildstamp.Values)
 	return nil
 }
 
-func (r *rootCmd) help(ctx context.Context, args []string) error {
-	showHelp(r.stderr)
-	return nil
-}
+func makeApp(root *appState) *cli.App {
+	app := &cli.App{
+		Name:  "engflow_auth",
+		Usage: "Authenticate to EngFlow remote build clusters",
+		Commands: []*cli.Command{
+			{
+				Name:  "get",
+				Usage: "Act as a bazel credential helper to provide credentials for a particular cluster",
+				UsageText: strings.TrimSpace(`
+Reads a Bazel credential helper request JSON payload from stdin and
+responds with a Bazel credential helper response JSON payload over
+stdout.
 
-func (r *rootCmd) run(ctx context.Context, args []string) error {
-	// No subcommand; show help text + clear error and exit
-	if len(args) == 0 {
-		showHelp(r.stderr)
-		return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "expected at least one subcommand")
+This command should only be used by tools that understand the Bazel
+credential helper protocol.`),
+				Action: root.get,
+			},
+			{
+				Name:  "login",
+				Usage: "Generate and store credentials for a particular cluster",
+				UsageText: strings.TrimSpace(`
+Initiates an interactive OAuth flow to log into the cluster at
+CLUSTER_URL.`),
+				Action: root.login,
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:  "alias",
+						Usage: "Comma-separated list of alias hostnames for this cluster",
+					},
+				},
+			},
+			{
+				Name:   "version",
+				Usage:  "Print version info for this application",
+				Action: root.version,
+			},
+		},
+		Before: func(ctx *cli.Context) error {
+			// Exit non-zero if no subcommand is provided (CLI library will take
+			// care of printing the help message, if applicable)
+			if ctx.NArg() < 1 {
+				return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "no subcommand provided; expected at least one subcommand")
+			}
+			return nil
+		},
+		ExitErrHandler: func(cCtx *cli.Context, err error) {
+			// The default handler will call os.Exit(); we want to do nothing so
+			// that the error is returned to the caller of app.RunContext(), and
+			// we will take care of calling os.Exit().
+		},
 	}
-
-	subCmdName, subCmdArgs := args[0], args[1:]
-	switch subCmdName {
-	case "get":
-		return r.get(ctx, subCmdArgs)
-	case "version":
-		return r.version(ctx, subCmdArgs)
-	case "help":
-		return r.help(ctx, subCmdArgs)
-	case "login":
-		return r.login(ctx, subCmdArgs)
-	default:
-		showHelp(r.stderr)
-		return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "unknown subcommand %q", subCmdName)
-	}
+	return app
 }
 
 func main() {
@@ -235,15 +220,14 @@ func main() {
 	if err != nil {
 		exitOnError(autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err))
 	}
-	root := &rootCmd{
+	root := &appState{
 		browserOpener: browserOpener,
 		authenticator: deviceAuth,
 		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
-		stdin:         os.Stdin,
-		stdout:        os.Stdout,
-		stderr:        os.Stderr,
 	}
-	exitOnError(root.run(ctx, os.Args[1:]))
+
+	app := makeApp(root)
+	exitOnError(app.RunContext(ctx, os.Args))
 }
 
 func exitOnError(err error) {
