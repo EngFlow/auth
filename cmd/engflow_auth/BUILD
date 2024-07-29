@@ -1,4 +1,5 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_cross_binary", "go_library", "go_test")
+load("@rules_pkg//:deb.bzl", "pkg_deb")
 load("//infra:visibility.bzl", "RELEASE_ARTIFACT")
 
 go_library(
@@ -56,4 +57,18 @@ go_cross_binary(
     platform = "@rules_go//go/toolchain:linux_amd64_cgo",
     target = ":engflow_auth",
     visibility = RELEASE_ARTIFACT,
+)
+
+pkg_tar(
+    name = "engflow_auth_linux_x64_tar",
+    srcs = [
+        ":engflow_auth_linux_x64",
+    ],
+    package_dir = "/usr/local/bin",
+)
+
+pkg_deb(
+    name = "engflow_auth_deb",
+    out = "engflow_auth.deb",
+    data = "",
 )
