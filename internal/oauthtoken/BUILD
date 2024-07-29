@@ -13,9 +13,9 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/autherr",
-        "@com_github_golang_jwt_jwt_v5//:go_default_library",
-        "@com_github_zalando_go_keyring//:go_default_library",
-        "@org_golang_x_oauth2//:go_default_library",
+        "@com_github_golang_jwt_jwt_v5//:jwt",
+        "@com_github_zalando_go_keyring//:go-keyring",
+        "@org_golang_x_oauth2//:oauth2",
     ],
 )
 
@@ -29,11 +29,11 @@ go_test(
     embed = [":oauthtoken"],
     deps = [
         "//internal/autherr",
-        "@com_github_golang_jwt_jwt_v5//:go_default_library",
-        "@com_github_google_uuid//:go_default_library",
-        "@com_github_stretchr_testify//assert:go_default_library",
-        "@com_github_stretchr_testify//require:go_default_library",
-        "@com_github_zalando_go_keyring//:go_default_library",
-        "@org_golang_x_oauth2//:go_default_library",
+        "@com_github_golang_jwt_jwt_v5//:jwt",
+        "@com_github_google_uuid//:uuid",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@com_github_zalando_go_keyring//:go-keyring",
+        "@org_golang_x_oauth2//:oauth2",
     ],
 )
