@@ -1,3 +1,17 @@
+# Copyright 2024 EngFlow Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Presubmit checks for PRs
 name: "presubmit"
 
@@ -75,3 +89,20 @@ jobs:
           # TODO(CUS-345): Enable remote execution
           bazel run --config=noninteractive @rules_go//go -- test ./...
           bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
+
+  copyright-headers-check:
+    runs-on:
+      - self-hosted
+      - os=linux
+      - arch=x64
+      - os_distribution=debian
+      - os_version=12
+      - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check copyright headers
+        run: |
+          bazel run --config=noninteractive //infra/internal/check_copyright_headers
