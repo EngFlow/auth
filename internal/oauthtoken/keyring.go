@@ -34,14 +34,6 @@ type Keyring struct {
 
 var _ LoadStorer = (*Keyring)(nil)
 
-// keyringPrefix is prepended to the cluster name to get the the service name
-// under which the token is stored.
-//
-// DO NOT CHANGE: existing tokens would be lost.
-//
-// Tests may replace this to avoid interfering with the user's real tokens.
-var keyringPrefix = "engflow.com/engflow_auth/"
-
 func NewKeyring() (LoadStorer, error) {
 	u, err := user.Current()
 	if err != nil {
@@ -85,5 +77,5 @@ func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token
 }
 
 func (f *Keyring) secretServiceName(cluster string) string {
-	return fmt.Sprintf("%s/%s", keyringPrefix, cluster)
+	return fmt.Sprintf("engflow.com/engflow_auth/%s", cluster)
 }
