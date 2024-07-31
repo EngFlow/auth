@@ -429,6 +429,49 @@ func TestRun(t *testing.T) {
 				`,"aliases":["cluster.local.example.com:8080"]`, // Should have aliases
 			},
 		},
+		{
+			desc:         "import with no data",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(""),
+			wantCode:     autherr.CodeBadParams,
+			wantErr:      "failed to unmarshal token data from stdin",
+		},
+		{
+			desc:         "import with valid data",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			tokenStore:   &fakeStore{},
+			wantStoreCallsFor: []string{
+				"cluster.example.com",
+			},
+		},
+		{
+			desc:         "import with alias",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com","aliases":["cluster.local.example.com"]}`),
+			tokenStore:   &fakeStore{},
+			wantStoreCallsFor: []string{
+				"cluster.example.com",
+				"cluster.local.example.com",
+			},
+		},
+		{
+			desc:         "import with store error",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			tokenStore: &fakeStore{
+				storeErr: errors.New("token_store_fail"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+			wantErr:  "token_store_fail",
+		},
+		{
+			desc:         "import with invalid cluster",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"grpcs://cluster.example.com:8080"}`),
+			wantCode:     autherr.CodeBadParams,
+			wantErr:      "token data contains invalid cluster",
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {

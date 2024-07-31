@@ -128,6 +128,49 @@ func (r *appState) export(cliCtx *cli.Context) error {
 	return nil
 }
 
+func (r *appState) import_(cliCtx *cli.Context) error {
+	ctx := cliCtx.Context
+
+	var token ExportedToken
+	if err := json.NewDecoder(cliCtx.App.Reader).Decode(&token); err != nil {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to unmarshal token data from stdin: %w", err)
+	}
+
+	toValidate := append([]string{token.ClusterHost}, token.Aliases...)
+	var storeURLs []*url.URL
+	for _, u := range toValidate {
+		clusterURL, err := sanitizedURL(u)
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeBadParams, "token data contains invalid cluster: %w", err)
+		}
+		storeURLs = append(storeURLs, clusterURL)
+	}
+
+	var storeErrs []error
+	for _, storeURL := range storeURLs {
+		if err := r.tokenStore.Store(ctx, storeURL.Host, token.Token); err != nil {
+			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
+		}
+	}
+
+	if err := errors.Join(storeErrs...); err != nil {
+		return autherr.CodedErrorf(
+			autherr.CodeTokenStoreFailure,
+			"%d token store operation(s) failed:\n%v",
+			len(storeErrs),
+			err,
+		)
+	}
+
+	fmt.Fprintf(
+		cliCtx.App.ErrWriter,
+		"Successfully saved credentials for %[1]s.\nTo use, ensure the line below is in your .bazelrc:\n\n\tbuild --credential_helper=%[1]s=%s\n",
+		storeURLs[0].Hostname(),
+		os.Args[0])
+
+	return nil
+}
+
 func (r *appState) login(cliCtx *cli.Context) error {
 	ctx := cliCtx.Context
 
@@ -242,6 +285,11 @@ credential helper protocol.`),
 						Usage: "Comma-separated list of alias hostnames for this cluster",
 					},
 				},
+			},
+			{
+				Name:   "import",
+				Usage:  "Imports a data blob containing auth token(s) exported via `engflow_auth export` from stdin",
+				Action: root.import_,
 			},
 			{
 				Name:  "login",
