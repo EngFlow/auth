@@ -27,6 +27,7 @@ import (
 )
 
 type Vars struct {
+	ReleaseVersion string
 	SourceBranch   string
 	SourceRevision string
 	IsClean        bool
@@ -42,6 +43,7 @@ const (
 )
 
 var (
+	releaseVersion      = unknown
 	gitBranch           = unknown
 	gitSha              = unknown
 	gitSourceTreeStatus = unknown
@@ -91,6 +93,7 @@ func init() {
 		}
 		// Assume stamping is enabled, and initialize Vars accordingly.
 
+		Values.ReleaseVersion = releaseVersion
 		Values.SourceBranch = gitBranch
 		Values.SourceRevision = gitSha
 		Values.IsClean = gitSourceTreeStatus == gitStatusClean
@@ -116,6 +119,9 @@ func (v Vars) String() string {
 		return "build metadata is unavailable (build with bazel's `--stamp` flag to enable)"
 	}
 	var sb strings.Builder
+	if v.ReleaseVersion != unknown {
+		fmt.Fprintf(&sb, "release version: %v\n", v.ReleaseVersion)
+	}
 	fmt.Fprintf(&sb, "build time: %v\n", v.BuildTimestamp)
 	fmt.Fprintf(&sb, "official build: %v\n", v.IsOfficial)
 	fmt.Fprintf(&sb, "build branch: %s\n", v.SourceBranch)

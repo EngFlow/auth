@@ -23,6 +23,7 @@
 
 echo BUILD_SCM_BRANCH $(git rev-parse --abbrev-ref HEAD)
 echo BUILD_SCM_REVISION $(git rev-parse --verify HEAD)
+echo STABLE_BUILD_RELEASE_VERSION ${BUILD_RELEASE_VERSION}
 
 git diff-index --quiet HEAD --
 if [[ $? == 0 ]]; then
