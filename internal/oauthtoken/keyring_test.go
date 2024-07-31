@@ -53,4 +53,11 @@ func TestKeyringTokenRoundtrip(t *testing.T) {
 	gotToken, gotErr := testKeyring.Load(ctx, cluster)
 	require.NoError(t, gotErr)
 	assert.Equal(t, gotToken, token)
+
+	gotErr = testKeyring.Delete(ctx, cluster)
+	require.NoError(t, gotErr)
+
+	gotToken, gotErr = testKeyring.Load(ctx, cluster)
+	require.Equal(t, autherr.ReauthRequired(cluster), gotErr)
+	require.Nil(t, gotToken)
 }

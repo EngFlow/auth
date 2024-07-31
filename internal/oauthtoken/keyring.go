@@ -76,6 +76,16 @@ func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token
 	return nil
 }
 
+func (f *Keyring) Delete(ctx context.Context, cluster string) error {
+	serviceName := f.secretServiceName(cluster)
+	if err := keyring.Delete(serviceName, f.username); errors.Is(err, keyring.ErrNotFound) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to delete oauth2 token from keyring service %q: %w", serviceName, err)
+	}
+	return nil
+}
+
 func (f *Keyring) secretServiceName(cluster string) string {
 	return fmt.Sprintf("engflow.com/engflow_auth/%s", cluster)
 }

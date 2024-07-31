@@ -337,6 +337,34 @@ func TestRun(t *testing.T) {
 			wantErr:  "token_store_fail",
 		},
 		{
+			desc:     "logout without cluster",
+			args:     []string{"logout"},
+			wantCode: autherr.CodeBadParams,
+			wantErr:  "expected exactly 1 positional argument",
+		},
+		{
+			desc: "logout with unknown cluster",
+			args: []string{"logout", "unknown.example.com"},
+		},
+		{
+			desc: "logout with cluster",
+			args: []string{"logout", "cluster.example.com"},
+			tokenStore: &oauthtoken.FakeLoadStorer{
+				Tokens: map[string]*oauth2.Token{
+					"cluster.example.com": {},
+				},
+			},
+		},
+		{
+			desc: "logout with error",
+			args: []string{"logout", "cluster.example.com"},
+			tokenStore: &oauthtoken.FakeLoadStorer{
+				DeleteErr: errors.New("token_delete_error"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+			wantErr:  "token_delete_error",
+		},
+		{
 			desc:     "export with no args",
 			args:     []string{"export"},
 			wantCode: autherr.CodeBadParams,
