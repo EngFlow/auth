@@ -26,12 +26,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func init() {
-	// Don't modify the user's real keyring during tests.
-	keyring.MockInit()
-}
-
 func TestKeyringTokenRoundtrip(t *testing.T) {
+	origKeyringPrefix := keyringPrefix
+	keyringPrefix += "TESTONLY/"
+	t.Cleanup(func() { keyringPrefix = origKeyringPrefix })
+
 	ctx := context.Background()
 	testKeyring := &Keyring{
 		username: "jmcclane",
@@ -40,6 +39,10 @@ func TestKeyringTokenRoundtrip(t *testing.T) {
 	token := &oauth2.Token{
 		AccessToken: uuid.New().String(),
 	}
+	t.Cleanup(func() {
+		keyring.Delete(keyringPrefix+cluster, testKeyring.username)
+	})
+
 	_, gotErr := testKeyring.Load(ctx, cluster)
 	require.Equal(t, autherr.ReauthRequired(cluster), gotErr)
 
