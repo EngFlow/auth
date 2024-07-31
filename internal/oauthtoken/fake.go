@@ -24,8 +24,8 @@ import (
 // FakeLoadStorer is a test implementation of LoadStorer that stores tokens in
 // memory instead of the system keychain.
 type FakeLoadStorer struct {
-	Tokens            map[string]*oauth2.Token
-	LoadErr, StoreErr error
+	Tokens                       map[string]*oauth2.Token
+	LoadErr, StoreErr, DeleteErr error
 }
 
 var _ LoadStorer = (*FakeLoadStorer)(nil)
@@ -52,5 +52,13 @@ func (f *FakeLoadStorer) Store(ctx context.Context, cluster string, token *oauth
 		return f.StoreErr
 	}
 	f.Tokens[cluster] = token
+	return nil
+}
+
+func (f *FakeLoadStorer) Delete(ctx context.Context, cluster string) error {
+	if f.DeleteErr != nil {
+		return f.DeleteErr
+	}
+	delete(f.Tokens, cluster)
 	return nil
 }
