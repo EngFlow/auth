@@ -17,7 +17,6 @@ package oauthtoken
 import (
 	"bytes"
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -47,13 +46,8 @@ func mustTokenForSubject(t *testing.T, name string) string {
 
 func TestTokenCacheWarning(t *testing.T) {
 	ctx := context.Background()
-	configDir := t.TempDir()
-	testPath := filepath.Join(configDir, "token_store.json")
 	var testStderr bytes.Buffer
-	tokenStore := &CacheAlert{
-		impl:   &File{path: testPath},
-		stderr: &testStderr,
-	}
+	tokenStore := NewCacheAlert(NewFakeLoadStorer(), &testStderr)
 
 	testTokenAlice := &oauth2.Token{
 		AccessToken: mustTokenForSubject(t, "alice"),

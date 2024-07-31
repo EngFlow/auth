@@ -26,17 +26,13 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var (
-	// Shim external functions to stub them while testing
-	keyringGet = keyring.Get
-	keyringSet = keyring.Set
-)
-
 // Keyring stores a JWT token on the user's keyring via the OS-specific
 // keyring mechanism of the current platform.
 type Keyring struct {
 	username string
 }
+
+var _ LoadStorer = (*Keyring)(nil)
 
 func NewKeyring() (LoadStorer, error) {
 	u, err := user.Current()
@@ -50,7 +46,7 @@ func NewKeyring() (LoadStorer, error) {
 
 func (f *Keyring) Load(ctx context.Context, cluster string) (*oauth2.Token, error) {
 	serviceName := f.secretServiceName(cluster)
-	contents, err := keyringGet(serviceName, f.username)
+	contents, err := keyring.Get(serviceName, f.username)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
 			return nil, autherr.ReauthRequired(cluster)
@@ -72,7 +68,7 @@ func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token
 		return err
 	}
 
-	err = keyringSet(serviceName, f.username, string(tokenStr))
+	err = keyring.Set(serviceName, f.username, string(tokenStr))
 	if err != nil {
 		return fmt.Errorf("failed to store token in OS keyring service %q: %w", serviceName, err)
 	}
