@@ -35,6 +35,16 @@ type appState struct {
 	tokenStore    oauthtoken.LoadStorer
 }
 
+type ExportedToken struct {
+	// OAuth2 token as returned from EngFlow auth endpoints
+	Token *oauth2.Token `json:"token"`
+	// Hostname of the cluster token was issued from
+	ClusterHost string `json:"cluster_host"`
+	// List of alternative hostnames for this cluster, for which this token
+	// should also apply
+	Aliases []string `json:"aliases,omitempty"`
+}
+
 func (r *appState) get(cliCtx *cli.Context) error {
 	ctx := cliCtx.Context
 
@@ -64,7 +74,42 @@ func (r *appState) get(cliCtx *cli.Context) error {
 		Expires: &token.Expiry,
 	}
 	if err := json.NewEncoder(cliCtx.App.Writer).Encode(res); err != nil {
-		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to marshal GetCredentialsResponse to JSON: %w", err)
+		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster host name; got %d", cliCtx.NArg())
+	}
+	return nil
+}
+
+func (r *appState) export(cliCtx *cli.Context) error {
+	ctx := cliCtx.Context
+
+	if cliCtx.NArg() != 1 {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster host name; got %d arguments", cliCtx.NArg())
+	}
+	clusterURL, err := sanitizedURL(cliCtx.Args().Get(0))
+	if err != nil {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
+	}
+
+	token, err := r.tokenStore.Load(ctx, clusterURL.Host)
+	if err != nil {
+		if reauthErr := (*autherr.CodedError)(nil); errors.As(err, &reauthErr) && reauthErr.Code == autherr.CodeReauthRequired {
+			return reauthErr
+		}
+		return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to fetch token for cluster %q: %w", clusterURL.Host, err)
+	}
+
+	if time.Now().After(token.Expiry) {
+		return autherr.ReauthRequired(clusterURL.Host)
+	}
+
+	export := &ExportedToken{
+		Token:       token,
+		ClusterHost: clusterURL.Host,
+		Aliases:     cliCtx.StringSlice("alias"),
+	}
+
+	if err := json.NewEncoder(cliCtx.App.Writer).Encode(export); err != nil {
+		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to marshal token info: %w", err)
 	}
 	return nil
 }
@@ -171,6 +216,18 @@ stdout.
 This command should only be used by tools that understand the Bazel
 credential helper protocol.`),
 				Action: root.get,
+			},
+			{
+				Name:      "export",
+				Usage:     "Prints the currently-stored token for the specified cluster to stdout",
+				ArgsUsage: " CLUSTER_URL",
+				Action:    root.export,
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						Name:  "alias",
+						Usage: "Comma-separated list of alias hostnames for this cluster",
+					},
+				},
 			},
 			{
 				Name:  "login",
