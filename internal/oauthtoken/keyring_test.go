@@ -27,7 +27,11 @@ import (
 )
 
 func init() {
-	// Don't modify the user's real keyring during tests.
+	// Use a mock keyring during tests, since the real implementation has global
+	// side effects in the user's environment. We could use the real
+	// implementation with a fake name, but:
+	// - On macOS, Bazel's sandbox blocks access to the keychain.
+	// - On Linux, dbus-launcher is not available in the test environment.
 	keyring.MockInit()
 }
 
