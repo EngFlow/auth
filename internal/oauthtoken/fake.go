@@ -30,7 +30,7 @@ type FakeTokenStore struct {
 
 var _ LoadStorer = (*FakeTokenStore)(nil)
 
-func NewFakeLoadStorer() *FakeTokenStore {
+func NewFakeTokenStore() *FakeTokenStore {
 	return &FakeTokenStore{
 		Tokens: make(map[string]*oauth2.Token),
 	}
