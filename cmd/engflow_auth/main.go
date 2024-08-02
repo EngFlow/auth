@@ -213,8 +213,12 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 	if cliCtx.NArg() != 1 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster name")
 	}
-	cluster := cliCtx.Args().Get(0)
-	if err := r.tokenStore.Delete(cliCtx.Context, cluster); err != nil {
+	clusterURL, err := sanitizedURL(cliCtx.Args().Get(0))
+	if err != nil {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
+	}
+
+	if err := r.tokenStore.Delete(cliCtx.Context, clusterURL.Host); err != nil {
 		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 	}
 	return nil
