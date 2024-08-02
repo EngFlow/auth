@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "cache_alert.go",
         "debug.go",
-        "file.go",
+        "fake.go",
         "keyring.go",
         "load_storer.go",
     ],
@@ -23,7 +23,6 @@ go_test(
     name = "oauthtoken_test",
     srcs = [
         "cache_alert_test.go",
-        "file_test.go",
         "keyring_test.go",
     ],
     embed = [":oauthtoken"],
