@@ -78,7 +78,8 @@ echo "[FINISH] Release branch checks"
 
 # Build release artifacts
 echo "[START]  Building artifacts"
-bazel build \
+BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
+    bazel build \
     --config=release \
     -- \
     //:release_artifacts
