@@ -21,22 +21,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// FakeLoadStorer is a test implementation of LoadStorer that stores tokens in
+// FakeTokenStore is a test implementation of LoadStorer that stores tokens in
 // memory instead of the system keychain.
-type FakeLoadStorer struct {
+type FakeTokenStore struct {
 	Tokens            map[string]*oauth2.Token
 	LoadErr, StoreErr error
 }
 
-var _ LoadStorer = (*FakeLoadStorer)(nil)
+var _ LoadStorer = (*FakeTokenStore)(nil)
 
-func NewFakeLoadStorer() *FakeLoadStorer {
-	return &FakeLoadStorer{
+func NewFakeLoadStorer() *FakeTokenStore {
+	return &FakeTokenStore{
 		Tokens: make(map[string]*oauth2.Token),
 	}
 }
 
-func (f *FakeLoadStorer) Load(ctx context.Context, cluster string) (*oauth2.Token, error) {
+func (f *FakeTokenStore) Load(ctx context.Context, cluster string) (*oauth2.Token, error) {
 	if f.LoadErr != nil {
 		return nil, f.LoadErr
 	}
@@ -47,7 +47,7 @@ func (f *FakeLoadStorer) Load(ctx context.Context, cluster string) (*oauth2.Toke
 	return token, nil
 }
 
-func (f *FakeLoadStorer) Store(ctx context.Context, cluster string, token *oauth2.Token) error {
+func (f *FakeTokenStore) Store(ctx context.Context, cluster string, token *oauth2.Token) error {
 	if f.StoreErr != nil {
 		return f.StoreErr
 	}
