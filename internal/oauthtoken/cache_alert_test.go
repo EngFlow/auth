@@ -47,7 +47,7 @@ func mustTokenForSubject(t *testing.T, name string) string {
 func TestTokenCacheWarning(t *testing.T) {
 	ctx := context.Background()
 	var testStderr bytes.Buffer
-	tokenStore := NewCacheAlert(NewFakeLoadStorer(), &testStderr)
+	tokenStore := NewCacheAlert(NewFakeTokenStore(), &testStderr)
 
 	testTokenAlice := &oauth2.Token{
 		AccessToken: mustTokenForSubject(t, "alice"),

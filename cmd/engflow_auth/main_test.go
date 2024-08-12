@@ -148,7 +148,7 @@ func TestRun(t *testing.T) {
 			desc:         "get propagates token store error",
 			args:         []string{"get"},
 			machineInput: strings.NewReader(`{"uri": "https://cluster.example.com"}`),
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				LoadErr: errors.New("token_load_error"),
 			},
 			wantCode: autherr.CodeReauthRequired,
@@ -158,7 +158,7 @@ func TestRun(t *testing.T) {
 			desc:         "get with URL expired",
 			args:         []string{"get"},
 			machineInput: strings.NewReader(`{"uri": "https://cluster.example.com"}`),
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
 						AccessToken: "access_token",
@@ -173,7 +173,7 @@ func TestRun(t *testing.T) {
 			desc:         "get with URL not expired",
 			args:         []string{"get"},
 			machineInput: strings.NewReader(`{"uri": "https://cluster.example.com"}`),
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
 						AccessToken: "access_token",
@@ -225,7 +225,7 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
-			tokenStore: oauthtoken.NewFakeLoadStorer(),
+			tokenStore: oauthtoken.NewFakeTokenStore(),
 			wantStored: []string{
 				"cluster.example.com",
 				"cluster.local.example.com",
@@ -239,7 +239,7 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				StoreErr: errors.New("token_store_fail"),
 			},
 			wantCode: autherr.CodeTokenStoreFailure,
@@ -330,7 +330,7 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				StoreErr: errors.New("token_store_fail"),
 			},
 			wantCode: autherr.CodeTokenStoreFailure,
@@ -349,7 +349,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "logout with cluster",
 			args: []string{"logout", "cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {},
 				},
@@ -358,7 +358,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "logout with error",
 			args: []string{"logout", "cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				DeleteErr: errors.New("token_delete_error"),
 			},
 			wantCode: autherr.CodeTokenStoreFailure,
@@ -379,7 +379,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "export when token not found",
 			args: []string{"export", "https://cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				LoadErr: autherr.ReauthRequired("https://cluster.example.com"),
 			},
 			wantCode: autherr.CodeReauthRequired,
@@ -388,7 +388,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "export when token store fails",
 			args: []string{"export", "https://cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				LoadErr: fmt.Errorf("token_load_error"),
 			},
 			wantCode: autherr.CodeTokenStoreFailure,
@@ -397,7 +397,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "export when token expired",
 			args: []string{"export", "https://cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
 						AccessToken: "access_token",
@@ -411,7 +411,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "export token",
 			args: []string{"export", "https://cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
 						AccessToken: "token_data",
@@ -428,7 +428,7 @@ func TestRun(t *testing.T) {
 		{
 			desc: "export token with alias",
 			args: []string{"export", "--alias", "cluster.local.example.com:8080", "https://cluster.example.com"},
-			tokenStore: &oauthtoken.FakeLoadStorer{
+			tokenStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
 						AccessToken: "token_data",
@@ -442,6 +442,49 @@ func TestRun(t *testing.T) {
 				`,"cluster_host":"cluster.example.com"`,         // Should have hostname
 				`,"aliases":["cluster.local.example.com:8080"]`, // Should have aliases
 			},
+		},
+		{
+			desc:         "import with no data",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(""),
+			wantCode:     autherr.CodeBadParams,
+			wantErr:      "failed to unmarshal token data from stdin",
+		},
+		{
+			desc:         "import with valid data",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			tokenStore:   oauthtoken.NewFakeTokenStore(),
+			wantStored: []string{
+				"cluster.example.com",
+			},
+		},
+		{
+			desc:         "import with alias",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com","aliases":["cluster.local.example.com"]}`),
+			tokenStore:   oauthtoken.NewFakeTokenStore(),
+			wantStored: []string{
+				"cluster.example.com",
+				"cluster.local.example.com",
+			},
+		},
+		{
+			desc:         "import with store error",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			tokenStore: &oauthtoken.FakeTokenStore{
+				StoreErr: errors.New("token_store_fail"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+			wantErr:  "token_store_fail",
+		},
+		{
+			desc:         "import with invalid cluster",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"grpcs://cluster.example.com:8080"}`),
+			wantCode:     autherr.CodeBadParams,
+			wantErr:      "token data contains invalid cluster",
 		},
 	}
 	for _, tc := range testCases {
@@ -462,7 +505,7 @@ func TestRun(t *testing.T) {
 				root.authenticator = &fakeAuth{}
 			}
 			if root.tokenStore == nil {
-				root.tokenStore = oauthtoken.NewFakeLoadStorer()
+				root.tokenStore = oauthtoken.NewFakeTokenStore()
 			}
 
 			app := makeApp(root)
@@ -501,7 +544,7 @@ func TestRun(t *testing.T) {
 					t.Logf("\n====== BEGIN APP STDERR ======\n%s\n====== END APP STDERR ======\n\n", stderr.String())
 				}
 			}
-			if tokenStore, ok := tc.tokenStore.(*oauthtoken.FakeLoadStorer); ok {
+			if tokenStore, ok := tc.tokenStore.(*oauthtoken.FakeTokenStore); ok {
 				assert.Subset(t, tokenStore.Tokens, tc.wantStored)
 			}
 		})
