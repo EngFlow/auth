@@ -23,4 +23,5 @@ import (
 type LoadStorer interface {
 	Load(context.Context, string) (*oauth2.Token, error)
 	Store(context.Context, string, *oauth2.Token) error
+	Delete(context.Context, string) error
 }

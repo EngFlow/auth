@@ -252,6 +252,21 @@ Visit %s for help.`,
 	return nil
 }
 
+func (r *appState) logout(cliCtx *cli.Context) error {
+	if cliCtx.NArg() != 1 {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster name")
+	}
+	clusterURL, err := sanitizedURL(cliCtx.Args().Get(0))
+	if err != nil {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
+	}
+
+	if err := r.tokenStore.Delete(cliCtx.Context, clusterURL.Host); err != nil {
+		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
+	}
+	return nil
+}
+
 func (r *appState) version(cliCtx *cli.Context) error {
 	fmt.Fprintf(cliCtx.App.Writer, "%s\n", buildstamp.Values)
 	return nil
@@ -295,7 +310,7 @@ credential helper protocol.`),
 				Name:  "login",
 				Usage: "Generate and store credentials for a particular cluster",
 				UsageText: strings.TrimSpace(`
-Initiates an interactive OAuth flow to log into the cluster at
+Initiates an interactive OAuth2 flow to log into the cluster at
 CLUSTER_URL.`),
 				Action: root.login,
 				Flags: []cli.Flag{
@@ -304,6 +319,14 @@ CLUSTER_URL.`),
 						Usage: "Comma-separated list of alias hostnames for this cluster",
 					},
 				},
+			},
+			{
+				Name:      "logout",
+				Usage:     "Remove a cluster's credentials from this machine",
+				ArgsUsage: " CLUSTER_URL",
+				UsageText: strings.TrimSpace(`
+Erases the credentials for the named cluster from the local machine.`),
+				Action: root.logout,
 			},
 			{
 				Name:   "version",
