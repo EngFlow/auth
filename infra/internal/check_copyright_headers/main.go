@@ -37,6 +37,7 @@ var (
 		regexp.MustCompile(`^WORKSPACE$`),
 		regexp.MustCompile(`(/|^)BUILD$`),
 		regexp.MustCompile(`^\.bazelrc$`),
+		regexp.MustCompile(`^\.bazelversion$`),
 		regexp.MustCompile(`^\.gitignore$`),
 		regexp.MustCompile(`\.bzl$`),
 	}
