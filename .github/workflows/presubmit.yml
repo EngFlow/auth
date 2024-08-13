@@ -30,7 +30,7 @@ env:
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CLUSTER_HOST: opal.cluster.engflow.com
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  OPAL_CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
+  CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
 
 jobs:
   bazel-builder:
