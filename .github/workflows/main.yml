@@ -23,9 +23,12 @@ on:
 concurrency:
   group: ${{ github.workflow }}.${{ github.ref }}
 
-# Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
 env:
+  # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CLUSTER_HOST: opal.cluster.engflow.com
+  CLUSTER_CONFIG: opal
+  CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   OPAL_RPC_CREDENTIALS: ${{ secrets.OPAL_RPC_CREDENTIALS }}
 
@@ -40,13 +43,24 @@ jobs:
       - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
     timeout-minutes: 10
 
+    env:
+      ARCH: "x64"
+      OS: "linux"
+
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in
+        run: infra/login.sh
+
       - name: Run all tests
+        if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel test --config=noninteractive //...
+          bazel test --config=noninteractive --config="${CLUSTER_CONFIG}" //...
+
+      - name: Log out
+        run: infra/logout.sh
 
   golang-builder:
     runs-on:
@@ -79,14 +93,24 @@ jobs:
             os_version: "2022"
             revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
 
+    env:
+      ARCH: "${{ matrix.arch }}"
+      OS: "${{ matrix.os }}"
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in
+        run: infra/login.sh
 
       - name: Run all tests
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive @rules_go//go -- test ./...
-          bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- clean -cache -modcache
+
+      - name: Log out
+        run: infra/logout.sh
 
   copyright-headers-check:
     runs-on:
@@ -98,9 +122,20 @@ jobs:
       - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
     timeout-minutes: 10
 
+    env:
+      ARCH: "${{ matrix.arch }}"
+      OS: "${{ matrix.os }}"
+
     steps:
       - uses: actions/checkout@v4
 
+      - name: Log in
+        run: infra/login.sh
+
       - name: Check copyright headers
+        if: success()
         run: |
-          bazel run --config=noninteractive //infra/internal/check_copyright_headers
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" //infra/internal/check_copyright_headers
+
+      - name: Log out
+        run: infra/logout.sh
