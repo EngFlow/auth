@@ -357,6 +357,10 @@ func main() {
 	defer cancel()
 
 	deviceAuth := oauthdevice.NewAuth(cliClientID, nil)
+	versionCheckingAuth, err := oauthdevice.NewServerVersioning(nil, deviceAuth)
+	if err != nil {
+		exitOnError(autherr.CodedErrorf(autherr.CodeUnknownError, "failed to create version-based token fetcher: %w", err))
+	}
 	browserOpener := &browser.StderrPrint{}
 	tokenStore, err := oauthtoken.NewKeyring()
 	if err != nil {
@@ -364,7 +368,7 @@ func main() {
 	}
 	root := &appState{
 		browserOpener: browserOpener,
-		authenticator: deviceAuth,
+		authenticator: versionCheckingAuth,
 		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
 	}
 
