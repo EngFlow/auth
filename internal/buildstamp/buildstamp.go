@@ -18,6 +18,7 @@
 package buildstamp
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"runtime/debug"
@@ -53,6 +54,8 @@ var (
 	emptyValues Vars
 
 	gitOfficialBranchRe = regexp.MustCompile(`main|release/v[0-9]+\.[0-9]+`)
+
+	ErrStampingDisabled = errors.New("build metadata is unavailable (build with bazel's `--stamp` flag to enable)")
 )
 
 func init() {
@@ -116,7 +119,7 @@ func lookupBuildSetting(info *debug.BuildInfo, name string) (string, bool) {
 
 func (v Vars) String() string {
 	if v == emptyValues {
-		return "build metadata is unavailable (build with bazel's `--stamp` flag to enable)"
+		return ErrStampingDisabled.Error()
 	}
 	var sb strings.Builder
 	if v.ReleaseVersion != unknown {
@@ -128,4 +131,36 @@ func (v Vars) String() string {
 	fmt.Fprintf(&sb, "build revision: %s\n", v.SourceRevision)
 	fmt.Fprintf(&sb, "clean build: %v\n", v.IsClean)
 	return sb.String()
+}
+
+type ErrUnofficialBuild struct {
+	parent *Vars
+}
+
+func (e ErrUnofficialBuild) Error() string {
+	why := "unknown reason"
+	if !e.parent.IsClean {
+		why = "built with modified source files"
+	} else if !gitOfficialBranchRe.MatchString(e.parent.SourceBranch) {
+		why = "built from non-release branch"
+	}
+	return "build is not official: " + why
+}
+
+func (v Vars) GetVersion() (string, error) {
+	if v == emptyValues {
+		return "", ErrStampingDisabled
+	}
+	if !v.IsOfficial || v.ReleaseVersion == unknown {
+		return fmt.Sprintf("v0.0.0-%s-%s", compactTime(v.BuildTimestamp), shortHash(v.SourceRevision)), nil
+	}
+	return v.ReleaseVersion, nil
+}
+
+func compactTime(t time.Time) string {
+	return t.UTC().Format("20060102150405")
+}
+
+func shortHash(commitStr string) string {
+	return commitStr[:12]
 }
