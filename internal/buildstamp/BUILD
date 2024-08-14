@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "buildstamp",
@@ -15,4 +15,11 @@ go_library(
         "gitSourceTreeStatus": "{BUILD_SCM_STATUS}",
         "buildTimestamp": "{BUILD_TIMESTAMP}",
     },
+)
+
+go_test(
+    name = "buildstamp_test",
+    srcs = ["buildstamp_test.go"],
+    embed = [":buildstamp"],
+    deps = ["@com_github_stretchr_testify//assert"],
 )
