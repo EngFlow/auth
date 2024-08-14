@@ -7,10 +7,10 @@ go_library(
     importpath = "github.com/EngFlow/auth/cmd/engflow_auth",
     visibility = ["//visibility:private"],
     deps = [
+        "//internal/auth",
         "//internal/autherr",
         "//internal/browser",
         "//internal/buildstamp",
-        "//internal/oauthdevice",
         "//internal/oauthtoken",
         "@com_github_engflow_credential_helper_go//:credential-helper-go",
         "@com_github_urfave_cli_v2//:cli",
@@ -29,9 +29,8 @@ go_test(
     srcs = ["main_test.go"],
     embed = [":engflow_auth_lib"],
     deps = [
+        "//internal/auth",
         "//internal/autherr",
-        "//internal/browser",
-        "//internal/oauthdevice",
         "//internal/oauthtoken",
         "@com_github_stretchr_testify//assert",
         "@org_golang_x_oauth2//:oauth2",

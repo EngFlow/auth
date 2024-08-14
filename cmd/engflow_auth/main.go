@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/EngFlow/auth/internal/auth"
 	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/EngFlow/auth/internal/browser"
 	"github.com/EngFlow/auth/internal/buildstamp"
-	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/urfave/cli/v2"
 
@@ -44,8 +44,7 @@ const (
 )
 
 type appState struct {
-	browserOpener browser.Opener
-	authenticator oauthdevice.Authenticator
+	authenticator auth.Backend
 	tokenStore    oauthtoken.LoadStorer
 }
 
@@ -194,7 +193,7 @@ func (r *appState) login(cliCtx *cli.Context) error {
 		}
 	}
 
-	authRes, err := r.authenticator.FetchCode(ctx, oauthURL)
+	token, err := r.authenticator.Authenticate(ctx, clusterURL)
 	if err != nil {
 		if oauthErr := (*oauth2.RetrieveError)(nil); errors.Is(err, autherr.UnexpectedHTML) || errors.As(err, &oauthErr) {
 			return autherr.CodedErrorf(
@@ -208,24 +207,6 @@ Visit %s for help.`,
 			)
 		}
 		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to generate device code: %w", err)
-	}
-	// The "complete" URI that includes the device code pre-populated is ideal,
-	// but technically optional. Prefer it, but fall back to the required URL in
-	// the response if necessary.
-	verificationURLStr := authRes.VerificationURIComplete
-	if verificationURLStr == "" {
-		verificationURLStr = authRes.VerificationURI
-	}
-	verificationURL, err := url.Parse(verificationURLStr)
-	if err != nil {
-		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to parse authentication URL: %w", err)
-	}
-	if err := r.browserOpener.Open(verificationURL); err != nil {
-		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to open browser to perform authentication: %w", err)
-	}
-	token, err := r.authenticator.FetchToken(ctx, authRes)
-	if err != nil {
-		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to obtain auth token: %w", err)
 	}
 
 	var storeErrs []error
@@ -356,14 +337,12 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	deviceAuth := oauthdevice.NewAuth(cliClientID, nil)
-	browserOpener := &browser.StderrPrint{}
+	deviceAuth := auth.NewDeviceCode(&browser.StderrPrint{}, cliClientID, nil)
 	tokenStore, err := oauthtoken.NewKeyring()
 	if err != nil {
 		exitOnError(autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err))
 	}
 	root := &appState{
-		browserOpener: browserOpener,
 		authenticator: deviceAuth,
 		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
 	}
