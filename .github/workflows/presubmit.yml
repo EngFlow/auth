@@ -16,6 +16,7 @@
 name: "presubmit"
 
 on:
+  workflow_dispatch:
   # Trigger on pull request rather than push, so that we can control whether
   # checks are run on a given PR (allowing checks to run automatically on PR
   # updates from third parties can be a security issue).
@@ -32,14 +33,16 @@ env:
   OPAL_RPC_CREDENTIALS: ${{ secrets.OPAL_RPC_CREDENTIALS }}
 
 jobs:
+  # TODO(OND-616): use remote execution and caching for all CI Runner jobs.
   bazel-builder:
     runs-on:
       - self-hosted
       - os=linux
       - arch=x64
-      - os_distribution=debian
-      - os_version=12
-      - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-pool=ci_sysbox_x64"
+      - "engflow-runtime=sysbox-runc"
+      - "engflow-runner-id=${{ github.repository_id }}_bazel-builder_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
 
     steps:
@@ -63,12 +66,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: "linux"
-            arch: "x64"
-            os_distribution: "debian"
-            os_version: "12"
-            revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
-
           - os: "macos"
             arch: "x64"
             os_distribution: "monterey"
@@ -90,14 +87,35 @@ jobs:
           bazel run --config=noninteractive @rules_go//go -- test ./...
           bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
 
+  golang-builder-ci-runners:
+    runs-on:
+      - self-hosted
+      - os=linux
+      - arch=x64
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-pool=ci_sysbox_x64"
+      - "engflow-runtime=sysbox-runc"
+      - "engflow-runner-id=${{ github.repository_id }}_golang-builder-ci-runners_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run all tests
+        run: |
+          # TODO(CUS-345): Enable remote execution
+          bazel run --config=noninteractive @rules_go//go -- test ./...
+          bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
+
   copyright-headers-check:
     runs-on:
       - self-hosted
       - os=linux
       - arch=x64
-      - os_distribution=debian
-      - os_version=12
-      - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-pool=ci_sysbox_x64"
+      - "engflow-runtime=sysbox-runc"
+      - "engflow-runner-id=${{ github.repository_id }}_copyright-headers-check_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
 
     steps:
