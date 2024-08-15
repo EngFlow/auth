@@ -15,7 +15,6 @@
 package oauthtoken
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,7 +43,7 @@ func NewKeyring() (LoadStorer, error) {
 	}, nil
 }
 
-func (f *Keyring) Load(ctx context.Context, cluster string) (*oauth2.Token, error) {
+func (f *Keyring) Load(cluster string) (*oauth2.Token, error) {
 	serviceName := f.secretServiceName(cluster)
 	contents, err := keyring.Get(serviceName, f.username)
 	if err != nil {
@@ -61,7 +60,7 @@ func (f *Keyring) Load(ctx context.Context, cluster string) (*oauth2.Token, erro
 	return parsed, nil
 }
 
-func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token) error {
+func (f *Keyring) Store(cluster string, token *oauth2.Token) error {
 	serviceName := f.secretServiceName(cluster)
 	tokenStr, err := json.Marshal(token)
 	if err != nil {
@@ -76,7 +75,7 @@ func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token
 	return nil
 }
 
-func (f *Keyring) Delete(ctx context.Context, cluster string) error {
+func (f *Keyring) Delete(cluster string) error {
 	serviceName := f.secretServiceName(cluster)
 	if err := keyring.Delete(serviceName, f.username); errors.Is(err, keyring.ErrNotFound) {
 		return nil

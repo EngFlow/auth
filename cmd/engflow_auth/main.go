@@ -60,8 +60,6 @@ type ExportedToken struct {
 }
 
 func (r *appState) get(cliCtx *cli.Context) error {
-	ctx := cliCtx.Context
-
 	if cliCtx.NArg() != 0 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected no positional args; got %d args: %v", cliCtx.NArg(), cliCtx.Args())
 	}
@@ -73,7 +71,7 @@ func (r *appState) get(cliCtx *cli.Context) error {
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to parse cluster URL %q from request: %w", req.URI, err)
 	}
-	token, err := r.tokenStore.Load(ctx, clusterURL.Host)
+	token, err := r.tokenStore.Load(clusterURL.Host)
 	if err != nil {
 		return autherr.ReauthRequired(clusterURL.Host)
 	}
@@ -94,8 +92,6 @@ func (r *appState) get(cliCtx *cli.Context) error {
 }
 
 func (r *appState) export(cliCtx *cli.Context) error {
-	ctx := cliCtx.Context
-
 	if cliCtx.NArg() != 1 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster host name; got %d arguments", cliCtx.NArg())
 	}
@@ -104,7 +100,7 @@ func (r *appState) export(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	token, err := r.tokenStore.Load(ctx, clusterURL.Host)
+	token, err := r.tokenStore.Load(clusterURL.Host)
 	if err != nil {
 		if reauthErr := (*autherr.CodedError)(nil); errors.As(err, &reauthErr) && reauthErr.Code == autherr.CodeReauthRequired {
 			return reauthErr
@@ -129,8 +125,6 @@ func (r *appState) export(cliCtx *cli.Context) error {
 }
 
 func (r *appState) import_(cliCtx *cli.Context) error {
-	ctx := cliCtx.Context
-
 	var token ExportedToken
 	if err := json.NewDecoder(cliCtx.App.Reader).Decode(&token); err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to unmarshal token data from stdin: %w", err)
@@ -148,7 +142,7 @@ func (r *appState) import_(cliCtx *cli.Context) error {
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(ctx, storeURL.Host, token.Token); err != nil {
+		if err := r.tokenStore.Store(storeURL.Host, token.Token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -230,7 +224,7 @@ Visit %s for help.`,
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(ctx, storeURL.Host, token); err != nil {
+		if err := r.tokenStore.Store(storeURL.Host, token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -261,7 +255,7 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	if err := r.tokenStore.Delete(cliCtx.Context, clusterURL.Host); err != nil {
+	if err := r.tokenStore.Delete(clusterURL.Host); err != nil {
 		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 	}
 	return nil

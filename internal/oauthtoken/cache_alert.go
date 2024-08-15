@@ -15,7 +15,6 @@
 package oauthtoken
 
 import (
-	"context"
 	"fmt"
 	"io"
 
@@ -38,13 +37,13 @@ func NewCacheAlert(impl LoadStorer, stderr io.Writer) LoadStorer {
 	}
 }
 
-func (a *CacheAlert) Store(ctx context.Context, cluster string, token *oauth2.Token) error {
-	oldToken, err := a.Load(ctx, cluster)
+func (a *CacheAlert) Store(cluster string, token *oauth2.Token) error {
+	oldToken, err := a.Load(cluster)
 	if err != nil || oldToken == nil {
 		// Failed to fetch any sort of previous valid token. Defer to the
 		// wrapped implementation; we'll assume that the token didn't exist
 		// previously (and therefore no need to issue a warning).
-		return a.LoadStorer.Store(ctx, cluster, token)
+		return a.LoadStorer.Store(cluster, token)
 	}
 
 	// Disable claims validation, since expired tokens should be allowed to
@@ -55,16 +54,16 @@ func (a *CacheAlert) Store(ctx context.Context, cluster string, token *oauth2.To
 	// concern.
 	_, _, err = parser.ParseUnverified(oldToken.AccessToken, oldClaims)
 	if err != nil {
-		return a.LoadStorer.Store(ctx, cluster, token)
+		return a.LoadStorer.Store(cluster, token)
 	}
 	_, _, err = parser.ParseUnverified(token.AccessToken, newClaims)
 	if err != nil {
-		return a.LoadStorer.Store(ctx, cluster, token)
+		return a.LoadStorer.Store(cluster, token)
 	}
 
 	if oldClaims.Subject != newClaims.Subject {
 		fmt.Fprintf(a.stderr, "WARNING: Login identity has changed since last login to %q.\nPlease run `bazel shutdown` in current workspaces in order to ensure bazel picks up new credentials.\n", cluster)
 	}
 
-	return a.LoadStorer.Store(ctx, cluster, token)
+	return a.LoadStorer.Store(cluster, token)
 }
