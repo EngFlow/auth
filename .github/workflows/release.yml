@@ -31,9 +31,10 @@ jobs:
       - self-hosted
       - os=linux
       - arch=x64
-      - os_distribution=debian
-      - os_version=12
-      - revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-pool=ci_sysbox_x64"
+      - "engflow-runtime=sysbox-runc"
+      - "engflow-runner-id=${{ github.repository_id }}_release_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
 
     steps:
