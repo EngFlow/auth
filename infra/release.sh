@@ -72,7 +72,7 @@ if ! git branch \
   --contains "$(git rev-parse HEAD)" \
   | grep --quiet --extended-regexp "main|${EXPECTED_RELEASE_BRANCH}"; then
     echo "Commit $(git rev-parse HEAD) is not on main or release branch ${EXPECTED_RELEASE_BRANCH}; exiting"
-    echo "Ignoring for testing the workflow (Ola)"
+    exit 1
 fi
 echo "[FINISH] Release branch checks"
 
