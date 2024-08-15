@@ -17,6 +17,7 @@ use_repo(
     "com_github_engflow_credential_helper_go",
     "com_github_golang_jwt_jwt_v5",
     "com_github_google_uuid",
+    "com_github_davecgh_go_spew",
     "com_github_stretchr_testify",
     "com_github_urfave_cli_v2",
     "com_github_zalando_go_keyring",

@@ -364,7 +364,7 @@ func main() {
 	}
 	root := &appState{
 		browserOpener: browserOpener,
-		authenticator: deviceAuth,
+		authenticator: &oauthdevice.HTTPLogging{Impl: deviceAuth},
 		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
 	}
 
