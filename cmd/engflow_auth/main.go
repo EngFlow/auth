@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/url"
 	"os"
@@ -31,6 +32,7 @@ import (
 	"github.com/EngFlow/auth/internal/buildstamp"
 	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/urfave/cli/v2"
 
 	credentialhelper "github.com/EngFlow/credential-helper-go"
@@ -71,12 +73,9 @@ func (r *appState) get(cliCtx *cli.Context) error {
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to parse cluster URL %q from request: %w", req.URI, err)
 	}
-	token, err := r.tokenStore.Load(clusterURL.Host)
+	token, err := r.loadToken(clusterURL.Host)
 	if err != nil {
-		return autherr.ReauthRequired(clusterURL.Host)
-	}
-	if time.Now().After(token.Expiry) {
-		return autherr.ReauthRequired(clusterURL.Host)
+		return err
 	}
 	res := &credentialhelper.GetCredentialsResponse{
 		Headers: map[string][]string{
@@ -99,17 +98,12 @@ func (r *appState) export(cliCtx *cli.Context) error {
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
-
-	token, err := r.tokenStore.Load(clusterURL.Host)
+	token, err := r.loadToken(clusterURL.Host)
 	if err != nil {
 		if reauthErr := (*autherr.CodedError)(nil); errors.As(err, &reauthErr) && reauthErr.Code == autherr.CodeReauthRequired {
 			return reauthErr
 		}
 		return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to fetch token for cluster %q: %w", clusterURL.Host, err)
-	}
-
-	if time.Now().After(token.Expiry) {
-		return autherr.ReauthRequired(clusterURL.Host)
 	}
 
 	export := &ExportedToken{
@@ -142,7 +136,7 @@ func (r *appState) import_(cliCtx *cli.Context) error {
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(storeURL.Host, token.Token); err != nil {
+		if err := r.storeToken(cliCtx, storeURL.Host, token.Token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -224,7 +218,7 @@ Visit %s for help.`,
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(storeURL.Host, token); err != nil {
+		if err := r.storeToken(cliCtx, storeURL.Host, token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -264,6 +258,61 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 func (r *appState) version(cliCtx *cli.Context) error {
 	fmt.Fprintf(cliCtx.App.Writer, "%s\n", buildstamp.Values)
 	return nil
+}
+
+// loadToken wraps LoadStorer.Load, standardizing error handling and expiry
+// checking across commands.
+func (r *appState) loadToken(cluster string) (*oauth2.Token, error) {
+	token, err := r.tokenStore.Load(cluster)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, autherr.ReauthRequired(cluster)
+	} else if err != nil {
+		if codeErr := (*autherr.CodedError)(nil); !errors.As(err, &codeErr) {
+			err = &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
+		}
+		return nil, err
+	}
+	if time.Now().After(token.Expiry) {
+		return nil, autherr.ReauthRequired(cluster)
+	}
+	return token, nil
+}
+
+// storeToken wraps LoadStorer.Store, standardizing error handling across
+// commands. It prints a warning if the user's identity has changed, which can
+// happen when the user logs into the cluster with a different identity, then
+// runs `engflow_auth login` again.
+func (r *appState) storeToken(cliCtx *cli.Context, cluster string, token *oauth2.Token) error {
+	oldToken, err := r.loadToken(cluster)
+	if err == nil && oldToken != nil && tokenSubjectChanged(oldToken, token) {
+		fmt.Fprintf(cliCtx.App.ErrWriter, "WARNING: Login identity has changed since last login to %q.\nPlease run `bazel shutdown` in current workspaces in order to ensure bazel picks up new credentials.\n", cluster)
+	}
+
+	if err := r.tokenStore.Store(cluster, token); err != nil {
+		if codeErr := (*autherr.CodedError)(nil); !errors.As(err, &codeErr) {
+			err = &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
+		}
+		return err
+	}
+	return nil
+}
+
+// tokenSubjectChanged parses two tokens as JWTs and returns true if the
+// subject is different. tokenSubjectChanged returns false if there's an error
+// parsing either token.
+//
+// tokenSubjectChanged does not verify tokens and must not be used in a
+// security context.
+func tokenSubjectChanged(oldToken, newToken *oauth2.Token) bool {
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	var oldClaims, newClaims jwt.RegisteredClaims
+	if _, _, err := parser.ParseUnverified(oldToken.AccessToken, &oldClaims); err != nil {
+		return false
+	}
+	if _, _, err := parser.ParseUnverified(newToken.AccessToken, &newClaims); err != nil {
+		return false
+	}
+	return oldClaims.Subject != newClaims.Subject
 }
 
 func makeApp(root *appState) *cli.App {
@@ -359,7 +408,7 @@ func main() {
 	root := &appState{
 		browserOpener: browserOpener,
 		authenticator: deviceAuth,
-		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
+		tokenStore:    tokenStore,
 	}
 
 	app := makeApp(root)

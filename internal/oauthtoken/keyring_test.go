@@ -16,9 +16,9 @@ package oauthtoken
 
 import (
 	"errors"
+	"io/fs"
 	"testing"
 
-	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ func TestKeyringTokenRoundtrip(t *testing.T) {
 		AccessToken: uuid.New().String(),
 	}
 	_, gotErr := testKeyring.Load(cluster)
-	require.Equal(t, autherr.ReauthRequired(cluster), gotErr)
+	require.ErrorIs(t, gotErr, fs.ErrNotExist)
 
 	gotErr = testKeyring.Store(cluster, token)
 	require.NoError(t, gotErr)

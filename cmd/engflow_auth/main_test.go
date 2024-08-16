@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"strings"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	"github.com/EngFlow/auth/internal/browser"
 	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 )
@@ -78,17 +80,18 @@ func codedErrorContains(t *testing.T, gotErr error, code int, wantMsg string) bo
 }
 
 type fakeAuth struct {
-	res           *oauth2.DeviceAuthResponse
+	codeRes       *oauth2.DeviceAuthResponse
+	token         *oauth2.Token
 	fetchCodeErr  error
 	fetchTokenErr error
 }
 
 func (f *fakeAuth) FetchCode(ctx context.Context, authEndpint *oauth2.Endpoint) (*oauth2.DeviceAuthResponse, error) {
-	return f.res, f.fetchCodeErr
+	return f.codeRes, f.fetchCodeErr
 }
 
 func (f *fakeAuth) FetchToken(ctx context.Context, authRes *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
-	return nil, f.fetchTokenErr
+	return f.token, f.fetchTokenErr
 }
 
 type fakeBrowser struct {
@@ -97,6 +100,18 @@ type fakeBrowser struct {
 
 func (f *fakeBrowser) Open(u *url.URL) error {
 	return f.openErr
+}
+
+func encodeFakeAccessToken(subject string) string {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": subject,
+	})
+	key := make([]byte, 32)
+	s, err := token.SignedString(key)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }
 
 func TestRun(t *testing.T) {
@@ -150,6 +165,15 @@ func TestRun(t *testing.T) {
 			machineInput: strings.NewReader(`{"uri": "https://cluster.example.com"}`),
 			tokenStore: &oauthtoken.FakeTokenStore{
 				LoadErr: errors.New("token_load_error"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+		},
+		{
+			desc:         "get with missing token",
+			args:         []string{"get"},
+			machineInput: strings.NewReader(`{"uri": "https://cluster.example.com"}`),
+			tokenStore: &oauthtoken.FakeTokenStore{
+				LoadErr: fmt.Errorf("no such token: %w", fs.ErrNotExist),
 			},
 			wantCode: autherr.CodeReauthRequired,
 			wantErr:  "Please refresh credentials",
@@ -212,7 +236,7 @@ func TestRun(t *testing.T) {
 			desc: "login happy path",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
@@ -221,7 +245,7 @@ func TestRun(t *testing.T) {
 			desc: "login with alias",
 			args: []string{"login", "--alias", "cluster.local.example.com", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
@@ -235,7 +259,7 @@ func TestRun(t *testing.T) {
 			desc: "login with alias with store errors",
 			args: []string{"login", "--alias", "cluster.local.example.com", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
@@ -249,7 +273,7 @@ func TestRun(t *testing.T) {
 			desc: "login with host and port",
 			args: []string{"login", "cluster.example.com:8080"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com:8080/with/auth/code",
 				},
 			},
@@ -264,7 +288,7 @@ func TestRun(t *testing.T) {
 			desc: "login code fetch failure",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 				fetchCodeErr: errors.New("fetch_code_fail"),
@@ -276,7 +300,7 @@ func TestRun(t *testing.T) {
 			desc: "login code fetch RetrieveError",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 				fetchCodeErr: &oauth2.RetrieveError{},
@@ -288,7 +312,7 @@ func TestRun(t *testing.T) {
 			desc: "login code fetch unexpected HTML",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 				fetchCodeErr: autherr.UnexpectedHTML,
@@ -300,7 +324,7 @@ func TestRun(t *testing.T) {
 			desc: "login browser open failure",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
@@ -314,7 +338,7 @@ func TestRun(t *testing.T) {
 			desc: "login token fetch failure",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 				fetchTokenErr: errors.New("fetch_token_fail"),
@@ -326,7 +350,7 @@ func TestRun(t *testing.T) {
 			desc: "login token store failure",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
+				codeRes: &oauth2.DeviceAuthResponse{
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
@@ -335,6 +359,30 @@ func TestRun(t *testing.T) {
 			},
 			wantCode: autherr.CodeTokenStoreFailure,
 			wantErr:  "token_store_fail",
+		},
+		{
+			desc: "login subject changed",
+			args: []string{"login", "cluster.example.com"},
+			authenticator: &fakeAuth{
+				codeRes: &oauth2.DeviceAuthResponse{
+					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
+				},
+				token: &oauth2.Token{
+					AccessToken: encodeFakeAccessToken("alice@example.com"),
+				},
+			},
+			tokenStore: &oauthtoken.FakeTokenStore{
+				Tokens: map[string]*oauth2.Token{
+					"cluster.example.com": {
+						AccessToken: encodeFakeAccessToken("bob@example.com"),
+						Expiry:      expiresInFuture,
+					},
+				},
+			},
+			wantStderrContaining: []string{
+				"Login identity has changed",
+				"bazel shutdown",
+			},
 		},
 		{
 			desc:     "logout without cluster",

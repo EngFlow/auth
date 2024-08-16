@@ -18,9 +18,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os/user"
 
-	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
@@ -48,7 +48,7 @@ func (f *Keyring) Load(cluster string) (*oauth2.Token, error) {
 	contents, err := keyring.Get(serviceName, f.username)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
-			return nil, autherr.ReauthRequired(cluster)
+			return nil, &notFoundError{service: serviceName, user: f.username}
 		}
 		return nil, fmt.Errorf("failed to look up token for service %q: %w", serviceName, err)
 	}
@@ -87,4 +87,18 @@ func (f *Keyring) Delete(cluster string) error {
 
 func (f *Keyring) secretServiceName(cluster string) string {
 	return fmt.Sprintf("engflow.com/engflow_auth/%s", cluster)
+}
+
+// notFoundError is more descriptive than keyring.ErrNotFound and matches
+// fs.ErrNotExist for more standardized error handling.
+type notFoundError struct {
+	service, user string
+}
+
+func (e *notFoundError) Error() string {
+	return fmt.Sprintf("secret %s for user %s not found in keyring", e.service, e.user)
+}
+
+func (e *notFoundError) Is(err error) bool {
+	return err == fs.ErrNotExist
 }
