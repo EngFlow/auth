@@ -16,7 +16,6 @@ package oauthtoken
 
 import (
 	"bytes"
-	"context"
 	"testing"
 	"time"
 
@@ -45,7 +44,6 @@ func mustTokenForSubject(t *testing.T, name string) string {
 }
 
 func TestTokenCacheWarning(t *testing.T) {
-	ctx := context.Background()
 	var testStderr bytes.Buffer
 	tokenStore := NewCacheAlert(NewFakeTokenStore(), &testStderr)
 
@@ -59,16 +57,16 @@ func TestTokenCacheWarning(t *testing.T) {
 	}
 
 	// Storing an initial token should produce no warning
-	err := tokenStore.Store(ctx, "default", testTokenAlice)
+	err := tokenStore.Store("default", testTokenAlice)
 	require.NoError(t, err)
 	assert.Len(t, testStderr.String(), 0)
-	err = tokenStore.Store(ctx, "special", testTokenAlice)
+	err = tokenStore.Store("special", testTokenAlice)
 	require.NoError(t, err)
 	assert.Len(t, testStderr.String(), 0)
 
 	// Storing a token with a different principal for a given cluster should
 	// produce a warning
-	err = tokenStore.Store(ctx, "default", testTokenBob)
+	err = tokenStore.Store("default", testTokenBob)
 	require.NoError(t, err)
 	assert.Contains(t, testStderr.String(), "Login identity has changed")
 	assert.Contains(t, testStderr.String(), "bazel shutdown")
@@ -76,7 +74,7 @@ func TestTokenCacheWarning(t *testing.T) {
 
 	// Storing a token with the same principal for a given cluster should
 	// produce no warning
-	err = tokenStore.Store(ctx, "special", testTokenAlice)
+	err = tokenStore.Store("special", testTokenAlice)
 	require.NoError(t, err)
 	assert.Len(t, testStderr.String(), 0)
 }

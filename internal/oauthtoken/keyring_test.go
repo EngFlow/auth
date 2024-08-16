@@ -15,7 +15,6 @@
 package oauthtoken
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -37,7 +36,6 @@ func init() {
 }
 
 func TestKeyringTokenRoundtrip(t *testing.T) {
-	ctx := context.Background()
 	testKeyring := &Keyring{
 		username: "jmcclane",
 	}
@@ -45,13 +43,13 @@ func TestKeyringTokenRoundtrip(t *testing.T) {
 	token := &oauth2.Token{
 		AccessToken: uuid.New().String(),
 	}
-	_, gotErr := testKeyring.Load(ctx, cluster)
+	_, gotErr := testKeyring.Load(cluster)
 	require.Equal(t, autherr.ReauthRequired(cluster), gotErr)
 
-	gotErr = testKeyring.Store(ctx, cluster, token)
+	gotErr = testKeyring.Store(cluster, token)
 	require.NoError(t, gotErr)
 
-	gotToken, gotErr := testKeyring.Load(ctx, cluster)
+	gotToken, gotErr := testKeyring.Load(cluster)
 	require.NoError(t, gotErr)
 	assert.Equal(t, gotToken, token)
 }
@@ -60,10 +58,9 @@ func TestKeyringLoadError(t *testing.T) {
 	wantErr := errors.New("load_error")
 	keyring.MockInitWithError(wantErr)
 	t.Cleanup(keyring.MockInit)
-	ctx := context.Background()
 	testKeyring := &Keyring{username: "jmcclane"}
 	cluster := "nakatomiplaza.cluster.engflow.com"
-	_, gotErr := testKeyring.Load(ctx, cluster)
+	_, gotErr := testKeyring.Load(cluster)
 	require.ErrorIs(t, gotErr, wantErr)
 	require.ErrorContains(t, gotErr, "failed to look up token")
 }
@@ -72,13 +69,12 @@ func TestKeyringStoreError(t *testing.T) {
 	wantErr := errors.New("store_error")
 	keyring.MockInitWithError(wantErr)
 	t.Cleanup(keyring.MockInit)
-	ctx := context.Background()
 	testKeyring := &Keyring{username: "jmcclane"}
 	cluster := "nakatomiplaza.cluster.engflow.com"
 	token := &oauth2.Token{
 		AccessToken: uuid.New().String(),
 	}
-	gotErr := testKeyring.Store(ctx, cluster, token)
+	gotErr := testKeyring.Store(cluster, token)
 	require.ErrorIs(t, gotErr, wantErr)
 	require.ErrorContains(t, gotErr, "failed to store token")
 }
