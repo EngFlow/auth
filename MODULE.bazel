@@ -1,4 +1,5 @@
 """Module for the engflow_auth credential-helper CLI."""
+
 module(
     name = "engflow_auth",
     version = "1.0.0",
