@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -45,10 +46,28 @@ const (
 	cliClientID = "69a59a782cbce2a1bda9d6e643a20e0c08f630fbf0d960674376a70f0b1942a9"
 )
 
+// appState holds the app's main dependencies. Different implementations of
+// those dependencies may be used for the main app and for tests.
 type appState struct {
 	browserOpener browser.Opener
 	authenticator oauthdevice.Authenticator
-	tokenStore    oauthtoken.LoadStorer
+
+	// keyringStore manages tokens in the user's encrypted keyring. This is
+	// typically only available in interactive desktop environments.
+	keyringStore oauthtoken.LoadStorer
+
+	// fileStore manages tokens in the user's configuration directory in
+	// plaintext. The user may opt into storing tokens here when encrypted
+	// storage is not available.
+	fileStore oauthtoken.LoadStorer
+
+	// config holds the contents of the app's configuration file.
+	config config
+
+	// When writeConfig is true, the app will write config to its configuration
+	// file before exiting if there's no error. Subcommands may set this after
+	// editing config.
+	writeConfig bool
 }
 
 type ExportedToken struct {
@@ -103,7 +122,7 @@ func (r *appState) export(cliCtx *cli.Context) error {
 		if reauthErr := (*autherr.CodedError)(nil); errors.As(err, &reauthErr) && reauthErr.Code == autherr.CodeReauthRequired {
 			return reauthErr
 		}
-		return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to fetch token for cluster %q: %w", clusterURL.Host, err)
+		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 	}
 
 	export := &ExportedToken{
@@ -248,11 +267,7 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
-
-	if err := r.tokenStore.Delete(clusterURL.Host); err != nil {
-		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
-	}
-	return nil
+	return r.deleteToken(clusterURL.Host)
 }
 
 func (r *appState) version(cliCtx *cli.Context) error {
@@ -260,10 +275,14 @@ func (r *appState) version(cliCtx *cli.Context) error {
 	return nil
 }
 
-// loadToken wraps LoadStorer.Load, standardizing error handling and expiry
-// checking across commands.
+// loadToken wraps LoadStorer.Load, for whichever LoadStorer holds the
+// cluster's token. It also standardizes error handling and expiry checking.
 func (r *appState) loadToken(cluster string) (*oauth2.Token, error) {
-	token, err := r.tokenStore.Load(cluster)
+	ts, err := r.findLoadStorerForCluster(cluster)
+	if err != nil {
+		return nil, err
+	}
+	token, err := ts.Load(cluster)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, autherr.ReauthRequired(cluster)
 	} else if err != nil {
@@ -278,23 +297,77 @@ func (r *appState) loadToken(cluster string) (*oauth2.Token, error) {
 	return token, nil
 }
 
-// storeToken wraps LoadStorer.Store, standardizing error handling across
-// commands. It prints a warning if the user's identity has changed, which can
-// happen when the user logs into the cluster with a different identity, then
-// runs `engflow_auth login` again.
+// storeToken wraps LoadStorer.Store. It selects a LoadStorer based on
+// the value of the "-store" flag. It prints a warning if the user's identity
+// has changed, which can happen when the user logs into the cluster with a
+// different identity, then runs `engflow_auth login` again.
 func (r *appState) storeToken(cliCtx *cli.Context, cluster string, token *oauth2.Token) error {
 	oldToken, err := r.loadToken(cluster)
 	if err == nil && oldToken != nil && tokenSubjectChanged(oldToken, token) {
 		fmt.Fprintf(cliCtx.App.ErrWriter, "WARNING: Login identity has changed since last login to %q.\nPlease run `bazel shutdown` in current workspaces in order to ensure bazel picks up new credentials.\n", cluster)
 	}
+	if err := r.deleteToken(cluster); err != nil {
+		return fmt.Errorf("deleting previous token: %w", err)
+	}
 
-	if err := r.tokenStore.Store(cluster, token); err != nil {
+	storeName := cliCtx.String("store")
+	ts, err := r.loadStorerByName(storeName)
+	if err != nil {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "-store must be one of %q, %q; got %q", keyringStoreName, fileStoreName, storeName)
+	}
+	if err := ts.Store(cluster, token); err != nil {
 		if codeErr := (*autherr.CodedError)(nil); !errors.As(err, &codeErr) {
 			err = &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 		}
 		return err
 	}
+	r.config.setTokenConfig(tokenConfig{
+		Cluster: cluster,
+		Store:   storeName,
+	})
+	r.writeConfig = true
+
 	return nil
+}
+
+// deleteToken wraps LoadStorer.Delete for whichever LoadStorer holds
+// the cluster's token.
+func (r *appState) deleteToken(cluster string) error {
+	ts, err := r.findLoadStorerForCluster(cluster)
+	if err != nil {
+		return err
+	}
+	if err := ts.Delete(cluster); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
+	}
+	if r.config.deleteTokenConfig(cluster) {
+		r.writeConfig = true
+	}
+	return nil
+}
+
+func (r *appState) findLoadStorerForCluster(cluster string) (oauthtoken.LoadStorer, error) {
+	var storeName string
+	tcfg, ok := r.config.findTokenConfig(cluster)
+	if ok {
+		storeName = tcfg.Store
+	}
+	return r.loadStorerByName(storeName)
+}
+
+func (r *appState) loadStorerByName(storeName string) (oauthtoken.LoadStorer, error) {
+	switch storeName {
+	case keyringStoreName:
+		return r.keyringStore, nil
+	case fileStoreName:
+		return r.fileStore, nil
+	case "":
+		// If the token isn't listed in the configuration file or if the store name
+		// is not set, default to keyring.
+		return r.keyringStore, nil
+	default:
+		return nil, autherr.CodedErrorf(autherr.CodeUnimplemented, "no such token store %q", storeName)
+	}
 }
 
 // tokenSubjectChanged parses two tokens as JWTs and returns true if the
@@ -348,6 +421,13 @@ credential helper protocol.`),
 				Name:   "import",
 				Usage:  "Imports a data blob containing auth token(s) exported via `engflow_auth export` from stdin",
 				Action: root.import_,
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "store",
+						Usage:       "Where to store the token. May be 'keyring' for the encrypted keyring (desktop OS only) or 'file' for unencrypted storage.",
+						DefaultText: "keyring",
+					},
+				},
 			},
 			{
 				Name:  "login",
@@ -360,6 +440,11 @@ CLUSTER_URL.`),
 					&cli.StringSliceFlag{
 						Name:  "alias",
 						Usage: "Comma-separated list of alias hostnames for this cluster",
+					},
+					&cli.StringFlag{
+						Name:        "store",
+						Usage:       "Where to store the token. May be 'keyring' for the encrypted keyring (desktop OS only) or 'file' for unencrypted storage.",
+						DefaultText: "keyring",
 					},
 				},
 			},
@@ -399,20 +484,43 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		exitOnError(err)
+	}
+	configFilePath := filepath.Join(userConfigDir, configName)
+	config, err := readConfigFile(configFilePath)
+	if err != nil {
+		exitOnError(err)
+	}
+
 	deviceAuth := oauthdevice.NewAuth(cliClientID, nil)
 	browserOpener := &browser.StderrPrint{}
-	tokenStore, err := oauthtoken.NewKeyring()
+
+	keyring, err := oauthtoken.NewKeyring()
 	if err != nil {
 		exitOnError(autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err))
 	}
+
+	fileStoreDirPath := filepath.Join(userConfigDir, fileStoreDirName)
+	fileStore, err := oauthtoken.NewFileTokenStore(fileStoreDirPath)
+	if err != nil {
+		exitOnError(&autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err})
+	}
+
 	root := &appState{
 		browserOpener: browserOpener,
 		authenticator: deviceAuth,
-		tokenStore:    tokenStore,
+		config:        config,
+		keyringStore:  keyring,
+		fileStore:     fileStore,
 	}
 
 	app := makeApp(root)
 	exitOnError(app.RunContext(ctx, os.Args))
+	if root.writeConfig {
+		exitOnError(writeConfigFile(configFilePath, root.config))
+	}
 }
 
 func exitOnError(err error) {

@@ -3,7 +3,10 @@ load("//infra:visibility.bzl", "RELEASE_ARTIFACT")
 
 go_library(
     name = "engflow_auth_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "config.go",
+        "main.go",
+    ],
     importpath = "github.com/EngFlow/auth/cmd/engflow_auth",
     visibility = ["//visibility:private"],
     deps = [

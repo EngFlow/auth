@@ -18,8 +18,9 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// A LoadStorer can load, store, or delete OAuth2 tokens.
 type LoadStorer interface {
-	Load(string) (*oauth2.Token, error)
-	Store(string, *oauth2.Token) error
-	Delete(string) error
+	Load(cluster string) (*oauth2.Token, error)
+	Store(cluster string, token *oauth2.Token) error
+	Delete(cluster string) error
 }

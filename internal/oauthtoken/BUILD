@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "debug.go",
         "fake.go",
+        "file.go",
         "keyring.go",
         "load_storer.go",
     ],
@@ -18,7 +19,10 @@ go_library(
 
 go_test(
     name = "oauthtoken_test",
-    srcs = ["keyring_test.go"],
+    srcs = [
+        "keyring_test.go",
+        "load_storer_test.go",
+    ],
     embed = [":oauthtoken"],
     deps = [
         "@com_github_google_uuid//:uuid",

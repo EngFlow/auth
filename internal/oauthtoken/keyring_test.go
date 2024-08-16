@@ -16,11 +16,9 @@ package oauthtoken
 
 import (
 	"errors"
-	"io/fs"
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
@@ -33,25 +31,6 @@ func init() {
 	// - On macOS, Bazel's sandbox blocks access to the keychain.
 	// - On Linux, dbus-launcher is not available in the test environment.
 	keyring.MockInit()
-}
-
-func TestKeyringTokenRoundtrip(t *testing.T) {
-	testKeyring := &Keyring{
-		username: "jmcclane",
-	}
-	cluster := "nakatomiplaza.cluster.engflow.com"
-	token := &oauth2.Token{
-		AccessToken: uuid.New().String(),
-	}
-	_, gotErr := testKeyring.Load(cluster)
-	require.ErrorIs(t, gotErr, fs.ErrNotExist)
-
-	gotErr = testKeyring.Store(cluster, token)
-	require.NoError(t, gotErr)
-
-	gotToken, gotErr := testKeyring.Load(cluster)
-	require.NoError(t, gotErr)
-	assert.Equal(t, gotToken, token)
 }
 
 func TestKeyringLoadError(t *testing.T) {
