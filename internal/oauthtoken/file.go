@@ -36,7 +36,10 @@ type FileStore struct {
 var _ LoadStorer = (*FileStore)(nil)
 
 func NewFileTokenStore(dir string) (*FileStore, error) {
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dir), 0777); err != nil {
+		return nil, fmt.Errorf("creating parent of token directory: %w", err)
+	}
+	if err := os.Mkdir(dir, 0700); err != nil && !errors.Is(err, fs.ErrExist) {
 		return nil, fmt.Errorf("creating token directory: %w", err)
 	}
 	return &FileStore{dir: dir}, nil
@@ -45,7 +48,7 @@ func NewFileTokenStore(dir string) (*FileStore, error) {
 func (f *FileStore) Load(cluster string) (_ *oauth2.Token, err error) {
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("loading token for cluster %s: %w", cluster, err)
+			err = fmt.Errorf("loading token for cluster %q: %w", cluster, err)
 		}
 	}()
 
@@ -63,7 +66,7 @@ func (f *FileStore) Load(cluster string) (_ *oauth2.Token, err error) {
 func (f *FileStore) Store(cluster string, token *oauth2.Token) (err error) {
 	defer func() {
 		if err != nil {
-			err = fmt.Errorf("storing token for cluster %s: %w", cluster, err)
+			err = fmt.Errorf("storing token for cluster %q: %w", cluster, err)
 		}
 	}()
 
@@ -76,7 +79,7 @@ func (f *FileStore) Store(cluster string, token *oauth2.Token) (err error) {
 
 func (f *FileStore) Delete(cluster string) error {
 	if err := os.Remove(f.tokenFilePath(cluster)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("removing token for cluster %s: %w", cluster, err)
+		return fmt.Errorf("removing token for cluster %q: %w", cluster, err)
 	}
 	return nil
 }
