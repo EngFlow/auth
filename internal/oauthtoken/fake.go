@@ -16,6 +16,7 @@ package oauthtoken
 
 import (
 	"fmt"
+	"io/fs"
 
 	"golang.org/x/oauth2"
 )
@@ -41,7 +42,7 @@ func (f *FakeTokenStore) Load(cluster string) (*oauth2.Token, error) {
 	}
 	token, ok := f.Tokens[cluster]
 	if !ok {
-		return nil, fmt.Errorf("%s: token not found", cluster)
+		return nil, fmt.Errorf("cluster %q: %w", cluster, fs.ErrNotExist)
 	}
 	return token, nil
 }

@@ -127,7 +127,6 @@ func TestRun(t *testing.T) {
 		keyringStore  oauthtoken.LoadStorer
 		fileStore     oauthtoken.LoadStorer
 		browserOpener browser.Opener
-		config        config
 
 		wantCode             int
 		wantErr              string
@@ -135,7 +134,6 @@ func TestRun(t *testing.T) {
 		wantStderrContaining []string
 		wantKeyringStored    []string
 		wantFileStored       []string
-		wantWriteConfig      bool
 	}{
 		{
 			desc:     "no subcommand",
@@ -218,12 +216,6 @@ func TestRun(t *testing.T) {
 			desc:         "get with file",
 			args:         []string{"get"},
 			machineInput: strings.NewReader(`{"uri": "https://cluster.example.com"}`),
-			config: config{
-				Tokens: []tokenConfig{{
-					Cluster: "cluster.example.com",
-					Store:   "file",
-				}},
-			},
 			fileStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
@@ -267,7 +259,6 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc: "login with alias",
@@ -282,7 +273,6 @@ func TestRun(t *testing.T) {
 				"cluster.example.com",
 				"cluster.local.example.com",
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc: "login with alias with store errors",
@@ -306,7 +296,6 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com:8080/with/auth/code",
 				},
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc:     "login with invalid scheme",
@@ -413,7 +402,6 @@ func TestRun(t *testing.T) {
 				"Login identity has changed",
 				"bazel shutdown",
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc: "login store file",
@@ -423,8 +411,7 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
-			wantFileStored:  []string{"cluster.example.com"},
-			wantWriteConfig: true,
+			wantFileStored: []string{"cluster.example.com"},
 		},
 		{
 			desc:     "logout without cluster",
@@ -457,21 +444,11 @@ func TestRun(t *testing.T) {
 		{
 			desc: "logout with file",
 			args: []string{"logout", "cluster.example.com"},
-			config: config{
-				Tokens: []tokenConfig{{
-					Cluster: "cluster.example.com",
-					Store:   "file",
-				}},
-			},
-			keyringStore: &oauthtoken.FakeTokenStore{
-				DeleteErr: errors.New("do_not_call"),
-			},
 			fileStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {},
 				},
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc:     "export with no args",
@@ -555,12 +532,6 @@ func TestRun(t *testing.T) {
 		{
 			desc: "export file",
 			args: []string{"export", "cluster.example.com"},
-			config: config{
-				Tokens: []tokenConfig{{
-					Cluster: "cluster.example.com",
-					Store:   "file",
-				}},
-			},
 			fileStore: &oauthtoken.FakeTokenStore{
 				Tokens: map[string]*oauth2.Token{
 					"cluster.example.com": {
@@ -590,7 +561,6 @@ func TestRun(t *testing.T) {
 			wantKeyringStored: []string{
 				"cluster.example.com",
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc:         "import with alias",
@@ -601,7 +571,6 @@ func TestRun(t *testing.T) {
 				"cluster.example.com",
 				"cluster.local.example.com",
 			},
-			wantWriteConfig: true,
 		},
 		{
 			desc:         "import with store error",
@@ -621,11 +590,10 @@ func TestRun(t *testing.T) {
 			wantErr:      "token data contains invalid cluster",
 		},
 		{
-			desc:            "import to file",
-			args:            []string{"import", "-store=file"},
-			machineInput:    strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
-			wantFileStored:  []string{"cluster.example.com"},
-			wantWriteConfig: true,
+			desc:           "import to file",
+			args:           []string{"import", "-store=file"},
+			machineInput:   strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			wantFileStored: []string{"cluster.example.com"},
 		},
 	}
 	for _, tc := range testCases {
@@ -639,7 +607,6 @@ func TestRun(t *testing.T) {
 				authenticator: tc.authenticator,
 				keyringStore:  tc.keyringStore,
 				fileStore:     tc.fileStore,
-				config:        tc.config,
 			}
 			if root.browserOpener == nil {
 				root.browserOpener = &fakeBrowser{}
@@ -696,7 +663,6 @@ func TestRun(t *testing.T) {
 			if tokenStore, ok := tc.fileStore.(*oauthtoken.FakeTokenStore); ok {
 				assert.Subset(t, tokenStore.Tokens, tc.wantFileStored)
 			}
-			assert.Equal(t, tc.wantWriteConfig, root.writeConfig)
 		})
 	}
 }

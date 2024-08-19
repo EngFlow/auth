@@ -44,6 +44,18 @@ const (
 	// Arbitrarily-chosen string of random hex data. This must match the
 	// backend's expectation of the client ID.
 	cliClientID = "69a59a782cbce2a1bda9d6e643a20e0c08f630fbf0d960674376a70f0b1942a9"
+
+	// configDir is the directory within os.UserConfigDir where this app
+	// may store configuration files.
+	configDir = "engflow_auth"
+
+	// fileStoreDirName is the name of a directory where this app stores
+	// unencrypted tokens.
+	fileStoreDirName = configDir + "/tokens"
+
+	// keyringStoreName and fileStoreName are values for the -store flag.
+	keyringStoreName string = "keyring"
+	fileStoreName    string = "file"
 )
 
 // appState holds the app's main dependencies. Different implementations of
@@ -60,14 +72,6 @@ type appState struct {
 	// plaintext. The user may opt into storing tokens here when encrypted
 	// storage is not available.
 	fileStore oauthtoken.LoadStorer
-
-	// config holds the contents of the app's configuration file.
-	config config
-
-	// When writeConfig is true, the app will write config to its configuration
-	// file before exiting if there's no error. Subcommands may set this after
-	// editing config.
-	writeConfig bool
 }
 
 type ExportedToken struct {
@@ -275,14 +279,20 @@ func (r *appState) version(cliCtx *cli.Context) error {
 	return nil
 }
 
-// loadToken wraps LoadStorer.Load, for whichever LoadStorer holds the
-// cluster's token. It also standardizes error handling and expiry checking.
+// loadToken wraps LoadStorer.Load, first from the keyring store, falling back
+// to the file store on error. It also standardizes error handling and
+// expiry checking.
 func (r *appState) loadToken(cluster string) (*oauth2.Token, error) {
-	ts, err := r.findLoadStorerForCluster(cluster)
+	token, err := r.keyringStore.Load(cluster)
 	if err != nil {
-		return nil, err
+		var fileErr error
+		token, fileErr = r.fileStore.Load(cluster)
+		if fileErr == nil || errors.Is(err, fs.ErrNotExist) {
+			// Don't override the keyring error if it was something meaningful.
+			// This should be rare.
+			err = fileErr
+		}
 	}
-	token, err := ts.Load(cluster)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, autherr.ReauthRequired(cluster)
 	} else if err != nil {
@@ -311,62 +321,52 @@ func (r *appState) storeToken(cliCtx *cli.Context, cluster string, token *oauth2
 	}
 
 	storeName := cliCtx.String("store")
-	ts, err := r.loadStorerByName(storeName)
-	if err != nil {
+	var ts oauthtoken.LoadStorer
+	switch storeName {
+	case keyringStoreName:
+		ts = r.keyringStore
+	case fileStoreName:
+		ts = r.fileStore
+	default:
 		return autherr.CodedErrorf(autherr.CodeBadParams, "-store must be one of %q, %q; got %q", keyringStoreName, fileStoreName, storeName)
 	}
+
 	if err := ts.Store(cluster, token); err != nil {
 		if codeErr := (*autherr.CodedError)(nil); !errors.As(err, &codeErr) {
 			err = &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 		}
 		return err
 	}
-	r.config.setTokenConfig(tokenConfig{
-		Cluster: cluster,
-		Store:   storeName,
-	})
-	r.writeConfig = true
 
 	return nil
 }
 
-// deleteToken wraps LoadStorer.Delete for whichever LoadStorer holds
-// the cluster's token.
+// deleteToken wraps LoadStorer.Delete for both keyring and file store.
+// It returns:
+//
+//   - nil if a token was successfully deleted from at least one store and the
+//     other returned fs.ErrNotExist.
+//   - A CodedError equivalent to fs.ErrNotExist if both stores returned
+//     fs.ErrNotExist.
+//   - A CodedError wrapping any other store error.
 func (r *appState) deleteToken(cluster string) error {
-	ts, err := r.findLoadStorerForCluster(cluster)
-	if err != nil {
-		return err
-	}
-	if err := ts.Delete(cluster); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
-	}
-	if r.config.deleteTokenConfig(cluster) {
-		r.writeConfig = true
-	}
-	return nil
-}
+	keyringErr := r.keyringStore.Delete(cluster)
+	fileErr := r.fileStore.Delete(cluster)
+	switch {
+	case (keyringErr == nil && fileErr == nil) ||
+		(keyringErr == nil && errors.Is(fileErr, fs.ErrNotExist)) ||
+		(fileErr == nil && errors.Is(keyringErr, fs.ErrNotExist)):
+		return nil
 
-func (r *appState) findLoadStorerForCluster(cluster string) (oauthtoken.LoadStorer, error) {
-	var storeName string
-	tcfg, ok := r.config.findTokenConfig(cluster)
-	if ok {
-		storeName = tcfg.Store
-	}
-	return r.loadStorerByName(storeName)
-}
+	case keyringErr != nil && !errors.Is(keyringErr, fs.ErrNotExist):
+		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: keyringErr}
 
-func (r *appState) loadStorerByName(storeName string) (oauthtoken.LoadStorer, error) {
-	switch storeName {
-	case keyringStoreName:
-		return r.keyringStore, nil
-	case fileStoreName:
-		return r.fileStore, nil
-	case "":
-		// If the token isn't listed in the configuration file or if the store name
-		// is not set, default to keyring.
-		return r.keyringStore, nil
+	case fileErr != nil && !errors.Is(fileErr, fs.ErrNotExist):
+		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: fileErr}
+
 	default:
-		return nil, autherr.CodedErrorf(autherr.CodeUnimplemented, "no such token store %q", storeName)
+		// Both errors are fs.ErrNotExist.
+		return autherr.CodedErrorf(autherr.CodeBadParams, "no credentials were stored for cluster %q", cluster)
 	}
 }
 
@@ -423,9 +423,9 @@ credential helper protocol.`),
 				Action: root.import_,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:        "store",
-						Usage:       "Where to store the token. May be 'keyring' for the encrypted keyring (desktop OS only) or 'file' for unencrypted storage.",
-						DefaultText: "keyring",
+						Name:  "store",
+						Usage: "Where to store the token. May be 'keyring' for the encrypted keyring (desktop OS only) or 'file' for unencrypted storage.",
+						Value: "keyring",
 					},
 				},
 			},
@@ -442,9 +442,9 @@ CLUSTER_URL.`),
 						Usage: "Comma-separated list of alias hostnames for this cluster",
 					},
 					&cli.StringFlag{
-						Name:        "store",
-						Usage:       "Where to store the token. May be 'keyring' for the encrypted keyring (desktop OS only) or 'file' for unencrypted storage.",
-						DefaultText: "keyring",
+						Name:  "store",
+						Usage: "Where to store the token. May be 'keyring' for the encrypted keyring (desktop OS only) or 'file' for unencrypted storage.",
+						Value: "keyring",
 					},
 				},
 			},
@@ -484,16 +484,6 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	userConfigDir, err := os.UserConfigDir()
-	if err != nil {
-		exitOnError(err)
-	}
-	configFilePath := filepath.Join(userConfigDir, configName)
-	config, err := readConfigFile(configFilePath)
-	if err != nil {
-		exitOnError(err)
-	}
-
 	deviceAuth := oauthdevice.NewAuth(cliClientID, nil)
 	browserOpener := &browser.StderrPrint{}
 
@@ -502,6 +492,10 @@ func main() {
 		exitOnError(autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err))
 	}
 
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		exitOnError(err)
+	}
 	fileStoreDirPath := filepath.Join(userConfigDir, fileStoreDirName)
 	fileStore, err := oauthtoken.NewFileTokenStore(fileStoreDirPath)
 	if err != nil {
@@ -511,16 +505,12 @@ func main() {
 	root := &appState{
 		browserOpener: browserOpener,
 		authenticator: deviceAuth,
-		config:        config,
 		keyringStore:  keyring,
 		fileStore:     fileStore,
 	}
 
 	app := makeApp(root)
 	exitOnError(app.RunContext(ctx, os.Args))
-	if root.writeConfig {
-		exitOnError(writeConfigFile(configFilePath, root.config))
-	}
 }
 
 func exitOnError(err error) {
