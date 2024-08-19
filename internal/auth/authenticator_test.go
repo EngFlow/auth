@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/EngFlow/auth/internal/buildstamp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/oauth2"
@@ -49,7 +50,10 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 func requestTargetMatches(url string) any {
 	return mock.MatchedBy(func(req *http.Request) bool {
-		return req.URL.String() == url
+		urlMatches := req.URL.String() == url
+		headerMatches := strings.HasPrefix(req.Header.Get("User-Agent"), "engflow_auth/")
+
+		return urlMatches && headerMatches
 	})
 }
 
@@ -77,6 +81,7 @@ func TestDeviceCode(t *testing.T) {
 		codeFetchErr       error
 		tokenFetchResponse *http.Response
 		tokenFetchErr      error
+		stampInfo          *buildstamp.Vars
 
 		wantToken *oauth2.Token
 		wantErr   string
@@ -122,6 +127,13 @@ func TestDeviceCode(t *testing.T) {
 
 			wantErr: "oauth2: cannot fetch token",
 		},
+		{
+			desc:              "no stamp values",
+			codeFetchResponse: httpResponse(200, `{"device_code":"75ba408f-fdf0-469a-a56e-b9a3a698f8b3","verification_uri":"https://oauth2.example.com/login?deviceCode\u003d75ba408f-fdf0-469a-a56e-b9a3a698f8b3","verification_uri_complete":"https://oauth2.example.com/login?deviceCode\u003d75ba408f-fdf0-469a-a56e-b9a3a698f8b3\u0026userCode\u003dKLJQ-OQGG","user_code":"KLJQ-OQGG","expires_in":300,"interval":1}`),
+			stampInfo:         &buildstamp.Vars{},
+
+			wantErr: "failed to get engflow_auth version",
+		},
 	}
 	for _, tc := range testCases {
 		testHost := &url.URL{Scheme: "https", Host: "oauth2.example.com"}
@@ -130,6 +142,24 @@ func TestDeviceCode(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
+
+			// Fake buildstamp values
+			oldStampVals := buildstamp.Values
+			defer func() {
+				buildstamp.Values = oldStampVals
+			}()
+			if tc.stampInfo != nil {
+				buildstamp.Values = *tc.stampInfo
+			} else {
+				buildstamp.Values = buildstamp.Vars{
+					ReleaseVersion: "v0.0.1",
+					SourceBranch:   "main",
+					SourceRevision: "abcd",
+					IsClean:        true,
+					IsOfficial:     true,
+					BuildTimestamp: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC),
+				}
+			}
 
 			opener := &mockOpener{}
 			opener.On("Open", mock.Anything).Return(tc.browserOpenErr)

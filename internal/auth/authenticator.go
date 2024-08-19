@@ -17,6 +17,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,6 +26,8 @@ import (
 
 	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/EngFlow/auth/internal/browser"
+	"github.com/EngFlow/auth/internal/buildstamp"
+	"github.com/EngFlow/auth/internal/httputil"
 )
 
 var errUnexpectedHTML = errors.New("request to JSON API returned HTML unexpectedly")
@@ -63,15 +66,30 @@ func NewDeviceCode(browserOpener browser.Opener, clientID string, scopes []strin
 
 func (d *DeviceCode) Authenticate(ctx context.Context, host *url.URL) (*oauth2.Token, error) {
 	// Under tests, the HTTP transport might be set in order to stub out network
-	// calls. If this is the case, ensure the oauth2 library is using it; the
-	// library API around this is that it discovers a client via the context, or
-	// uses some default if none is set (currently http.DefaultTransport).
+	// calls. If not, use the default HTTP transport (which is currently the
+	// oauth2 library's default as well).
+	transport := http.DefaultTransport
 	if d.httpTransport != nil {
-		client := &http.Client{
-			Transport: d.httpTransport,
-		}
-		ctx = context.WithValue(ctx, oauth2.HTTPClient, client)
+		transport = d.httpTransport
 	}
+
+	version, err := buildstamp.Values.GetVersion()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get engflow_auth version: %w", err)
+	}
+
+	// The oauth2 library discovers a client via the context, or uses some
+	// default if none is set. Create a client that (at least) inserts version
+	// headers.
+	client := &http.Client{
+		Transport: &httputil.HeaderInsertingTransport{
+			Transport: transport,
+			Headers: map[string][]string{
+				"User-Agent": {"engflow_auth/" + version},
+			},
+		},
+	}
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, client)
 
 	config := &oauth2.Config{
 		ClientID: d.clientID,
