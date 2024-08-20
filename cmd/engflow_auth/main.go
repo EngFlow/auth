@@ -44,6 +44,8 @@ const (
 )
 
 type appState struct {
+	// These vars are initialized by `build()` iff they are not pre-populated;
+	// they should be pre-populated in tests and left nil otherwise.
 	browserOpener browser.Opener
 	authenticator oauthdevice.Authenticator
 	tokenStore    oauthtoken.LoadStorer
@@ -57,6 +59,28 @@ type ExportedToken struct {
 	// List of alternative hostnames for this cluster, for which this token
 	// should also apply
 	Aliases []string `json:"aliases,omitempty"`
+}
+
+func (r *appState) build(cliCtx *cli.Context) error {
+	if cliCtx.NArg() < 1 {
+		return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "no subcommand provided; expected at least one subcommand")
+	}
+
+	if r.authenticator == nil {
+		r.authenticator = oauthdevice.NewAuth(cliClientID, nil)
+	}
+	if r.browserOpener == nil {
+		r.browserOpener = &browser.StderrPrint{}
+	}
+	if r.tokenStore == nil {
+		tokenStore, err := oauthtoken.NewKeyring()
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err)
+		}
+
+		r.tokenStore = oauthtoken.NewCacheAlert(tokenStore, cliCtx.App.ErrWriter)
+	}
+	return nil
 }
 
 func (r *appState) get(cliCtx *cli.Context) error {
@@ -328,14 +352,7 @@ Erases the credentials for the named cluster from the local machine.`),
 				Action: root.version,
 			},
 		},
-		Before: func(ctx *cli.Context) error {
-			// Exit non-zero if no subcommand is provided (CLI library will take
-			// care of printing the help message, if applicable)
-			if ctx.NArg() < 1 {
-				return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "no subcommand provided; expected at least one subcommand")
-			}
-			return nil
-		},
+		Before: root.build,
 		ExitErrHandler: func(cCtx *cli.Context, err error) {
 			// The default handler will call os.Exit(); we want to do nothing so
 			// that the error is returned to the caller of app.RunContext(), and
@@ -350,19 +367,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	deviceAuth := oauthdevice.NewAuth(cliClientID, nil)
-	browserOpener := &browser.StderrPrint{}
-	tokenStore, err := oauthtoken.NewKeyring()
-	if err != nil {
-		exitOnError(autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err))
-	}
-	root := &appState{
-		browserOpener: browserOpener,
-		authenticator: deviceAuth,
-		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
-	}
-
-	app := makeApp(root)
+	app := makeApp(&appState{})
 	exitOnError(app.RunContext(ctx, os.Args))
 }
 
