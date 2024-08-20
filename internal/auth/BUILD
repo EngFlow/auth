@@ -8,6 +8,8 @@ go_library(
     deps = [
         "//internal/autherr",
         "//internal/browser",
+        "//internal/buildstamp",
+        "//internal/httputil",
         "@org_golang_x_oauth2//:oauth2",
     ],
 )
@@ -17,7 +19,6 @@ go_test(
     srcs = ["authenticator_test.go"],
     embed = [":auth"],
     deps = [
-        "//internal/browser",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//mock",
         "@org_golang_x_oauth2//:oauth2",
