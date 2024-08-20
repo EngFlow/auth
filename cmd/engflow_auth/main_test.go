@@ -25,9 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/EngFlow/auth/internal/auth"
 	"github.com/EngFlow/auth/internal/autherr"
-	"github.com/EngFlow/auth/internal/browser"
-	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -78,25 +77,11 @@ func codedErrorContains(t *testing.T, gotErr error, code int, wantMsg string) bo
 }
 
 type fakeAuth struct {
-	res           *oauth2.DeviceAuthResponse
-	fetchCodeErr  error
 	fetchTokenErr error
 }
 
-func (f *fakeAuth) FetchCode(ctx context.Context, authEndpint *oauth2.Endpoint) (*oauth2.DeviceAuthResponse, error) {
-	return f.res, f.fetchCodeErr
-}
-
-func (f *fakeAuth) FetchToken(ctx context.Context, authRes *oauth2.DeviceAuthResponse) (*oauth2.Token, error) {
+func (f *fakeAuth) Authenticate(ctx context.Context, host *url.URL) (*oauth2.Token, error) {
 	return nil, f.fetchTokenErr
-}
-
-type fakeBrowser struct {
-	openErr error
-}
-
-func (f *fakeBrowser) Open(u *url.URL) error {
-	return f.openErr
 }
 
 func TestRun(t *testing.T) {
@@ -108,9 +93,8 @@ func TestRun(t *testing.T) {
 		args []string
 
 		machineInput  io.Reader
-		authenticator oauthdevice.Authenticator
+		authenticator auth.Backend
 		tokenStore    oauthtoken.LoadStorer
-		browserOpener browser.Opener
 
 		wantCode             int
 		wantErr              string
@@ -211,20 +195,10 @@ func TestRun(t *testing.T) {
 		{
 			desc: "login happy path",
 			args: []string{"login", "cluster.example.com"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-			},
 		},
 		{
-			desc: "login with alias",
-			args: []string{"login", "--alias", "cluster.local.example.com", "cluster.example.com"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-			},
+			desc:       "login with alias",
+			args:       []string{"login", "--alias", "cluster.local.example.com", "cluster.example.com"},
 			tokenStore: oauthtoken.NewFakeTokenStore(),
 			wantStored: []string{
 				"cluster.example.com",
@@ -234,11 +208,6 @@ func TestRun(t *testing.T) {
 		{
 			desc: "login with alias with store errors",
 			args: []string{"login", "--alias", "cluster.local.example.com", "cluster.example.com"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-			},
 			tokenStore: &oauthtoken.FakeTokenStore{
 				StoreErr: errors.New("token_store_fail"),
 			},
@@ -248,11 +217,6 @@ func TestRun(t *testing.T) {
 		{
 			desc: "login with host and port",
 			args: []string{"login", "cluster.example.com:8080"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com:8080/with/auth/code",
-				},
-			},
 		},
 		{
 			desc:     "login with invalid scheme",
@@ -261,25 +225,10 @@ func TestRun(t *testing.T) {
 			wantErr:  "illegal scheme",
 		},
 		{
-			desc: "login code fetch failure",
-			args: []string{"login", "cluster.example.com"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-				fetchCodeErr: errors.New("fetch_code_fail"),
-			},
-			wantCode: autherr.CodeAuthFailure,
-			wantErr:  "fetch_code_fail",
-		},
-		{
 			desc: "login code fetch RetrieveError",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-				fetchCodeErr: &oauth2.RetrieveError{},
+				fetchTokenErr: &oauth2.RetrieveError{},
 			},
 			wantCode: autherr.CodeAuthFailure,
 			wantErr:  "This cluster may not support 'engflow_auth login'.\nVisit https://cluster.example.com/gettingstarted for help.",
@@ -288,35 +237,15 @@ func TestRun(t *testing.T) {
 			desc: "login code fetch unexpected HTML",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-				fetchCodeErr: autherr.UnexpectedHTML,
+				fetchTokenErr: autherr.UnexpectedHTML,
 			},
 			wantCode: autherr.CodeAuthFailure,
 			wantErr:  "This cluster may not support 'engflow_auth login'.\nVisit https://cluster.example.com/gettingstarted for help.",
 		},
 		{
-			desc: "login browser open failure",
-			args: []string{"login", "cluster.example.com"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-			},
-			browserOpener: &fakeBrowser{
-				openErr: errors.New("browser_open_fail"),
-			},
-			wantCode: autherr.CodeAuthFailure,
-			wantErr:  "browser_open_fail",
-		},
-		{
 			desc: "login token fetch failure",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
 				fetchTokenErr: errors.New("fetch_token_fail"),
 			},
 			wantCode: autherr.CodeAuthFailure,
@@ -325,11 +254,6 @@ func TestRun(t *testing.T) {
 		{
 			desc: "login token store failure",
 			args: []string{"login", "cluster.example.com"},
-			authenticator: &fakeAuth{
-				res: &oauth2.DeviceAuthResponse{
-					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
-				},
-			},
 			tokenStore: &oauthtoken.FakeTokenStore{
 				StoreErr: errors.New("token_store_fail"),
 			},
@@ -494,12 +418,8 @@ func TestRun(t *testing.T) {
 			stderr := bytes.NewBuffer(nil)
 
 			root := &appState{
-				browserOpener: tc.browserOpener,
 				authenticator: tc.authenticator,
 				tokenStore:    tc.tokenStore,
-			}
-			if root.browserOpener == nil {
-				root.browserOpener = &fakeBrowser{}
 			}
 			if root.authenticator == nil {
 				root.authenticator = &fakeAuth{}
