@@ -16,6 +16,7 @@ package oauthtoken
 
 import (
 	"fmt"
+	"io/fs"
 
 	"golang.org/x/oauth2"
 )
@@ -58,6 +59,29 @@ func (f *FakeTokenStore) Delete(cluster string) error {
 	if f.DeleteErr != nil {
 		return f.DeleteErr
 	}
+	if _, ok := f.Tokens[cluster]; !ok {
+		return fs.ErrNotExist
+	}
 	delete(f.Tokens, cluster)
 	return nil
+}
+
+func (f *FakeTokenStore) WithToken(cluster string, token *oauth2.Token) *FakeTokenStore {
+	f.Tokens[cluster] = token
+	return f
+}
+
+func (f *FakeTokenStore) WithLoadErr(err error) *FakeTokenStore {
+	f.LoadErr = err
+	return f
+}
+
+func (f *FakeTokenStore) WithStoreErr(err error) *FakeTokenStore {
+	f.StoreErr = err
+	return f
+}
+
+func (f *FakeTokenStore) WithDeleteErr(err error) *FakeTokenStore {
+	f.DeleteErr = err
+	return f
 }

@@ -91,7 +91,7 @@ func (f *Keyring) Store(cluster string, token *oauth2.Token) error {
 func (f *Keyring) Delete(cluster string) error {
 	serviceName := f.secretServiceName(cluster)
 	if err := keyring.Delete(serviceName, f.username); errors.Is(err, keyring.ErrNotFound) {
-		return nil
+		return &keyringNotFoundError{user: f.username, service: serviceName}
 	} else if err != nil {
 		return fmt.Errorf("failed to delete oauth2 token from keyring service %q: %w", serviceName, err)
 	}

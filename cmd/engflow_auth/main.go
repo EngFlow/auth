@@ -19,10 +19,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -73,12 +76,50 @@ func (r *appState) build(cliCtx *cli.Context) error {
 		r.browserOpener = &browser.StderrPrint{}
 	}
 	if r.tokenStore == nil {
-		tokenStore, err := oauthtoken.NewKeyring()
+		keyring, err := oauthtoken.NewKeyring()
 		if err != nil {
-			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err)
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open keyring-based token store: %w", err)
 		}
 
-		r.tokenStore = oauthtoken.NewCacheAlert(tokenStore, cliCtx.App.ErrWriter)
+		userConfigDir, err := os.UserConfigDir()
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to discover user's config dir: %w", err)
+		}
+		tokensDir := filepath.Join(userConfigDir, "engflow_auth", "tokens")
+		fileStore, err := oauthtoken.NewFileTokenStore(tokensDir)
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open file-based token store: %w", err)
+		}
+
+		errorStore := &oauthtoken.FakeTokenStore{
+			StoreErr: fmt.Errorf("subcommand attempted invalid write to token storage"),
+		}
+
+		var writeStore oauthtoken.LoadStorer
+		switch writeStoreName := cliCtx.String("store"); writeStoreName {
+		case "keyring":
+			writeStore = keyring
+		case "file":
+			writeStore = fileStore
+		case "":
+			// Subcommands that don't have this flag defined will cause the flag
+			// value fetch to return empty (as opposed to a sane default value).
+			// These commands shouldn't write to token storage (else they should
+			// define the flag) so the corresponding token storage object errors
+			// on writes.
+			writeStore = errorStore
+		default:
+			return autherr.CodedErrorf(autherr.CodeBadParams, "unknown token store type %q", writeStoreName)
+		}
+
+		r.tokenStore =
+			oauthtoken.NewCacheAlert(
+				oauthtoken.NewFallback(
+					/* gets Store() operations */ writeStore,
+					/* gets Load() operations */ keyring, fileStore,
+				),
+				cliCtx.App.ErrWriter,
+			)
 	}
 	return nil
 }
@@ -279,7 +320,9 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	if err := r.tokenStore.Delete(clusterURL.Host); err != nil {
+	if err := r.tokenStore.Delete(clusterURL.Host); errors.Is(err, fs.ErrNotExist) {
+		return &autherr.CodedError{Code: autherr.CodeBadParams, Err: fmt.Errorf("no credentials found for cluster %q", clusterURL.Host)}
+	} else if err != nil {
 		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 	}
 	return nil
@@ -291,6 +334,23 @@ func (r *appState) version(cliCtx *cli.Context) error {
 }
 
 func makeApp(root *appState) *cli.App {
+	storeFlag := &cli.StringFlag{
+		Name:  "store",
+		Usage: "Name of backend that should be used for token store operations",
+		Value: "keyring",
+		Action: func(ctx *cli.Context, s string) error {
+			allowedStoreBackends := []string{"keyring", "file"}
+			if !slices.Contains(allowedStoreBackends, s) {
+				return autherr.CodedErrorf(autherr.CodeBadParams, "invalid value %q for --store. Allowed values: %v", s, allowedStoreBackends)
+			}
+			return nil
+		},
+	}
+	aliasFlag := &cli.StringSliceFlag{
+		Name:  "alias",
+		Usage: "Comma-separated list of alias hostnames for this cluster",
+	}
+
 	app := &cli.App{
 		Name:  "engflow_auth",
 		Usage: "Authenticate to EngFlow remote build clusters",
@@ -312,16 +372,12 @@ credential helper protocol.`),
 				Usage:     "Prints the currently-stored token for the specified cluster to stdout",
 				ArgsUsage: " CLUSTER_URL",
 				Action:    root.export,
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "alias",
-						Usage: "Comma-separated list of alias hostnames for this cluster",
-					},
-				},
+				Flags:     []cli.Flag{aliasFlag},
 			},
 			{
 				Name:   "import",
 				Usage:  "Imports a data blob containing auth token(s) exported via `engflow_auth export` from stdin",
+				Flags:  []cli.Flag{storeFlag},
 				Action: root.import_,
 			},
 			{
@@ -331,12 +387,7 @@ credential helper protocol.`),
 Initiates an interactive OAuth2 flow to log into the cluster at
 CLUSTER_URL.`),
 				Action: root.login,
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "alias",
-						Usage: "Comma-separated list of alias hostnames for this cluster",
-					},
-				},
+				Flags:  []cli.Flag{aliasFlag, storeFlag},
 			},
 			{
 				Name:      "logout",
@@ -359,6 +410,17 @@ Erases the credentials for the named cluster from the local machine.`),
 			// we will take care of calling os.Exit().
 		},
 	}
+
+	// Ensure that all usage errors get an error code, for consistency with
+	// other error exit conditions.
+	usageErrWrapper := func(cliCtx *cli.Context, err error, isSubcommand bool) error {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "%w", err)
+	}
+	app.OnUsageError = usageErrWrapper
+	for _, cmd := range app.Commands {
+		cmd.OnUsageError = usageErrWrapper
+	}
+
 	return app
 }
 
@@ -418,7 +480,7 @@ func sanitizedURL(cluster string) (*url.URL, error) {
 	// - `Port` is optional, defaulting to whatever is implied by `Scheme`
 	// - All other fields are forbidden
 	if clusterURL.Scheme != "https" {
-		return nil, fmt.Errorf("illegal scheme %q; only 'https' is supported", clusterURL.Scheme)
+		return nil, fmt.Errorf("invalid scheme %q; only 'https' is supported", clusterURL.Scheme)
 	}
 	if clusterURL.Host == "" {
 		return nil, fmt.Errorf("cluster URL %q does not specify a host", clusterURL)
