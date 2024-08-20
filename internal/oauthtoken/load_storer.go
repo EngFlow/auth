@@ -18,8 +18,23 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// LoadStorer provides access to a token via some backend implementation/policy.
 type LoadStorer interface {
-	Load(string) (*oauth2.Token, error)
-	Store(string, *oauth2.Token) error
+	// Load loads a token for a cluster, specified by hostname. It returns
+	// fs.ErrNotFound if the token isn't present, or an unspecified non-nil
+	// error for any other error conditions.
+	Load(cluster string) (*oauth2.Token, error)
+
+	// Store stores a token for a cluster, specified by hostname. It returns an
+	// unspecified non-nil error if the operation fails; in this case, the state
+	// of the token storage for the specified cluster is not specified (token
+	// storage for other clusters is unaffected).
+	Store(cluster string, token *oauth2.Token) error
+
+	// Delete deletes a token for a cluster, specified by hostname. It returns
+	// fs.ErrNotFound if there is currently no token stored for the specified
+	// cluster, or an unspecified non-nil error for any other error conditions
+	// (although the storage backend should make a best-effort attempt to delete
+	// the token).
 	Delete(string) error
 }
