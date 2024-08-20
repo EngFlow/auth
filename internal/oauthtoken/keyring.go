@@ -18,12 +18,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os/user"
 
-	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
+
+type keyringNotFoundError struct {
+	service string
+	user    string
+}
+
+func (e *keyringNotFoundError) Error() string {
+	return fmt.Sprintf("secret %q for user %q not found in keyring", e.service, e.user)
+}
+
+func (e *keyringNotFoundError) Is(err error) bool {
+	return err == fs.ErrNotExist
+}
 
 // Keyring stores a JWT token on the user's keyring via the OS-specific
 // keyring mechanism of the current platform.
@@ -48,7 +61,7 @@ func (f *Keyring) Load(cluster string) (*oauth2.Token, error) {
 	contents, err := keyring.Get(serviceName, f.username)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
-			return nil, autherr.ReauthRequired(cluster)
+			return nil, &keyringNotFoundError{service: serviceName, user: f.username}
 		}
 		return nil, fmt.Errorf("failed to look up token for service %q: %w", serviceName, err)
 	}

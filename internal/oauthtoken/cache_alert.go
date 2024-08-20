@@ -39,7 +39,7 @@ func NewCacheAlert(impl LoadStorer, stderr io.Writer) LoadStorer {
 
 func (a *CacheAlert) Store(cluster string, token *oauth2.Token) error {
 	oldToken, err := a.Load(cluster)
-	if err != nil || oldToken == nil {
+	if err != nil {
 		// Failed to fetch any sort of previous valid token. Defer to the
 		// wrapped implementation; we'll assume that the token didn't exist
 		// previously (and therefore no need to issue a warning).
