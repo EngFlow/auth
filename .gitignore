@@ -1,1 +1,6 @@
 bazel-*
+
+# TODO(CUS-389): This file seems to thrash contents between builds (possibly due
+# to VSCode extension behavior). Ignore changes until we can better understand
+# and fix/mitigate this behavior.
+MODULE.bazel.lock
