@@ -31,10 +31,9 @@ fi
 
 readonly TOOLS_DIR=$(pwd)/_tools
 if [[ "${OS}" == "windows" ]]; then
-  readonly ENGFLOW_AUTH_EXT=.exe
+  readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth.exe"
 else
-  readonly ENGFLOW_AUTH_EXT=
+  readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth"
 fi
-readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth${ENGFLOW_AUTH_EXT}"
 
 "${ENGFLOW_AUTH_PATH}" logout "${CLUSTER_HOST}"
