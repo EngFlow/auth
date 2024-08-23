@@ -49,6 +49,7 @@ const (
 type appState struct {
 	// These vars are initialized by `build()` iff they are not pre-populated;
 	// they should be pre-populated in tests and left nil otherwise.
+	userConfigDir string
 	browserOpener browser.Opener
 	authenticator oauthdevice.Authenticator
 	tokenStore    oauthtoken.LoadStorer
@@ -65,10 +66,13 @@ type ExportedToken struct {
 }
 
 func (r *appState) build(cliCtx *cli.Context) error {
-	if cliCtx.NArg() < 1 {
-		return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "no subcommand provided; expected at least one subcommand")
+	if r.userConfigDir == "" {
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to discover user's config dir: %w", err)
+		}
+		r.userConfigDir = configDir
 	}
-
 	if r.authenticator == nil {
 		r.authenticator = oauthdevice.NewAuth(cliClientID, nil)
 	}
@@ -81,11 +85,7 @@ func (r *appState) build(cliCtx *cli.Context) error {
 			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open keyring-based token store: %w", err)
 		}
 
-		userConfigDir, err := os.UserConfigDir()
-		if err != nil {
-			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to discover user's config dir: %w", err)
-		}
-		tokensDir := filepath.Join(userConfigDir, "engflow_auth", "tokens")
+		tokensDir := filepath.Join(r.userConfigDir, "engflow_auth", "tokens")
 		fileStore, err := oauthtoken.NewFileTokenStore(tokensDir)
 		if err != nil {
 			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open file-based token store: %w", err)
@@ -403,12 +403,24 @@ Erases the credentials for the named cluster from the local machine.`),
 				Action: root.version,
 			},
 		},
-		Before: root.build,
+		Before: func(cliCtx *cli.Context) error {
+			if cliCtx.NArg() < 1 {
+				return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "no subcommand provided; expected at least one subcommand")
+			}
+			return nil
+		},
 		ExitErrHandler: func(cCtx *cli.Context, err error) {
 			// The default handler will call os.Exit(); we want to do nothing so
 			// that the error is returned to the caller of app.RunContext(), and
 			// we will take care of calling os.Exit().
 		},
+	}
+
+	// Call root.build after command-line parsing for whichever subcommand gets
+	// called. We need to know the value of the -store flag (if defined).
+	// It's available when Command.Before is called but not App.Before.
+	for _, cmd := range app.Commands {
+		cmd.Before = root.build
 	}
 
 	// Ensure that all usage errors get an error code, for consistency with
