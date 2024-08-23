@@ -44,8 +44,11 @@ readonly ENGFLOW_AUTH_VERSION=v0.0.5
 readonly TOOLS_DIR=$(pwd)/_tools
 readonly ENGFLOW_AUTH_URL="https://github.com/EngFlow/auth/releases/download/${ENGFLOW_AUTH_VERSION}/engflow_auth_${OS}_${ARCH}"
 if [[ "${OS}" == "windows" ]]; then
+  # On Windows, ensure engflow_auth has an .exe extension. Use an absolute
+  # Windows path with forward slashes (C:/a/b), NOT a cygwin path (/c/a/b),
+  # and NOT backslashes (C:\a\b). Bazel only accepts the first form.
   readonly ENGFLOW_AUTH_EXT=.exe
-  readonly ENGFLOW_AUTH_PATH="$(cygpath --windows "${TOOLS_DIR}/engflow_auth.exe")"
+  readonly ENGFLOW_AUTH_PATH="$(cygpath --mixed "${TOOLS_DIR}/engflow_auth.exe")"
 else
   readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth"
 fi
