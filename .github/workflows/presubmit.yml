@@ -99,6 +99,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Log in
+        shell: bash
         run: infra/login.sh
 
       - name: Run all tests
@@ -110,6 +111,7 @@ jobs:
           bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- clean -cache -modcache
 
       - name: Log out
+        shell: bash
         run: infra/logout.sh
 
   golang-builder-ci-runners:
