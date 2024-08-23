@@ -101,6 +101,7 @@ jobs:
         run: infra/login.sh
 
       - name: Run all tests
+        if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
           bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- test ./...
@@ -127,6 +128,7 @@ jobs:
         run: infra/login.sh
 
       - name: Run all tests
+        if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
           bazel run --config=noninteractive @rules_go//go -- test ./...

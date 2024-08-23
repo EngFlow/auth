@@ -30,8 +30,9 @@ env:
   # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CLUSTER_HOST: opal.cluster.engflow.com
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CLUSTER_CONFIG: opal
   CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   # TODO(OND-616): use remote execution and caching for all CI Runner jobs.
@@ -60,7 +61,7 @@ jobs:
         if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel test --config=noninteractive //...
+          bazel test --config=noninteractive --config="${CLUSTER_CONFIG}" //...
 
       - name: Log out
         run: infra/logout.sh
@@ -101,10 +102,11 @@ jobs:
         run: infra/login.sh
 
       - name: Run all tests
+        if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive @rules_go//go -- test ./...
-          bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- clean -cache -modcache
 
       - name: Log out
         run: infra/logout.sh
@@ -127,10 +129,11 @@ jobs:
         run: infra/login.sh
 
       - name: Run all tests
+        if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive @rules_go//go -- test ./...
-          bazel run --config=noninteractive @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- clean -cache -modcache
 
       - name: Log out
         run: infra/logout.sh
@@ -157,6 +160,7 @@ jobs:
         run: infra/login.sh
 
       - name: Check copyright headers
+        if: success()
         run: |
           bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" //infra/internal/check_copyright_headers
 
