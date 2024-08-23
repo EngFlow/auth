@@ -67,7 +67,7 @@ echo "[FINISH] Downloading gh CLI"
 
 echo "[START]  Release branch checks"
 # Current commit must be on either `main` or the corresponding release branch
-readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(v[0-9]+.[0-9]+).[0-9]+|release/\1|' <<<${RELEASE_VERSION})"
+readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(^v[0-9]+\.[0-9]+).\.*$|release/\1|' <<<${RELEASE_VERSION})"
 if ! git branch \
   --contains "$(git rev-parse HEAD)" \
   | grep --quiet --extended-regexp "main|${EXPECTED_RELEASE_BRANCH}"; then
