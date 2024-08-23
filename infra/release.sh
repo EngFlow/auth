@@ -23,14 +23,14 @@ if [[ "$#" -ne 1 ]]; then
 fi
 
 # Taken from https://semver.org/, with a `v` prepended
-readonly SEMVER_REGEX='^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
+readonly SEMVER_REGEX='^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-((0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
 readonly RELEASE_VERSION="$1"
 readonly GH_CLI_URL='https://storage.googleapis.com/engflow-tools-public/github.com/cli/cli/releases/download/v2.52.0/gh_2.52.0_linux_amd64.tar.gz'
 readonly GH_CLI_EXPECTED_SHA256='3ea6ed8b2585f406a064cecd7e1501e58f56c8e7ca764ae1f3483d1b8ed68826'
 
 echo "[START]  Release name checks"
 # Supplied version string must follow semver
-if ! egrep --quiet "${SEMVER_REGEX}" <<<${RELEASE_VERSION}; then
+if ! grep --quiet --extended-regexp "${SEMVER_REGEX}" <<<${RELEASE_VERSION}; then
   echo "Supplied version string '${RELEASE_VERSION}' does not follow semver; exiting"
   exit 1
 fi
