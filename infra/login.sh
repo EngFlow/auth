@@ -40,7 +40,7 @@ fi
 
 # Download a recent version of engflow_auth to a local directory,
 # then use it to import the credential.
-readonly ENGFLOW_AUTH_VERSION=v0.0.3
+readonly ENGFLOW_AUTH_VERSION=v0.0.5
 readonly TOOLS_DIR=$(pwd)/_tools
 readonly ENGFLOW_AUTH_URL="https://github.com/EngFlow/auth/releases/download/${ENGFLOW_AUTH_VERSION}/engflow_auth_${OS}_${ARCH}"
 if [[ "${OS}" == "windows" ]]; then
@@ -54,7 +54,7 @@ curl --location --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}"
 chmod +x "${ENGFLOW_AUTH_PATH}"
 
 # Import the credential.
-"${ENGFLOW_AUTH_PATH}" import <<<"${CRED_HELPER_TOKEN}"
+"${ENGFLOW_AUTH_PATH}" import -store=file <<<"${CRED_HELPER_TOKEN}"
 
 # Configure Bazel to use the credential.
 cat >.bazelrc.user <<EOF
