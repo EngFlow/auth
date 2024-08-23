@@ -45,10 +45,10 @@ readonly TOOLS_DIR=$(pwd)/_tools
 readonly ENGFLOW_AUTH_URL="https://github.com/EngFlow/auth/releases/download/${ENGFLOW_AUTH_VERSION}/engflow_auth_${OS}_${ARCH}"
 if [[ "${OS}" == "windows" ]]; then
   readonly ENGFLOW_AUTH_EXT=.exe
+  readonly ENGFLOW_AUTH_PATH="$(cygpath --windows "${TOOLS_DIR}/engflow_auth.exe")"
 else
-  readonly ENGFLOW_AUTH_EXT=
+  readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth"
 fi
-readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth${ENGFLOW_AUTH_EXT}"
 mkdir -p "${TOOLS_DIR}"
 if ! curl --fail-with-body --location --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}"; then
   cat "${ENGFLOW_AUTH_PATH}" >&2
