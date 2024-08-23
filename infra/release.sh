@@ -30,7 +30,7 @@ readonly GH_CLI_EXPECTED_SHA256='3ea6ed8b2585f406a064cecd7e1501e58f56c8e7ca764ae
 
 echo "[START]  Release name checks"
 # Supplied version string must follow semver
-if ! grep --quiet -E "${SEMVER_REGEX}" <<<${RELEASE_VERSION}; then
+if ! egrep --quiet "${SEMVER_REGEX}" <<<${RELEASE_VERSION}; then
   echo "Supplied version string '${RELEASE_VERSION}' does not follow semver; exiting"
   exit 1
 fi
