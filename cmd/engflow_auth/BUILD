@@ -34,6 +34,7 @@ go_test(
         "//internal/oauthdevice",
         "//internal/oauthtoken",
         "@com_github_stretchr_testify//assert",
+        "@com_github_zalando_go_keyring//:go-keyring",
         "@org_golang_x_oauth2//:oauth2",
     ],
 )

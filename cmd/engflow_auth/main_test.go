@@ -30,8 +30,14 @@ import (
 	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/stretchr/testify/assert"
+	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
+
+func init() {
+	// Tests should not interact with the user's real keyring.
+	keyring.MockInit()
+}
 
 func codedErrorContains(t *testing.T, gotErr error, code int, wantMsg string) bool {
 	t.Helper()
@@ -529,6 +535,7 @@ func TestRun(t *testing.T) {
 			stderr := bytes.NewBuffer(nil)
 
 			root := &appState{
+				userConfigDir: t.TempDir(),
 				browserOpener: tc.browserOpener,
 				authenticator: tc.authenticator,
 				tokenStore:    tc.tokenStore,
@@ -538,9 +545,6 @@ func TestRun(t *testing.T) {
 			}
 			if root.authenticator == nil {
 				root.authenticator = &fakeAuth{}
-			}
-			if root.tokenStore == nil {
-				root.tokenStore = oauthtoken.NewFakeTokenStore()
 			}
 
 			app := makeApp(root)
