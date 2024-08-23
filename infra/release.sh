@@ -23,7 +23,7 @@ if [[ "$#" -ne 1 ]]; then
 fi
 
 # Taken from https://semver.org/, with a `v` prepended
-readonly SEMVER_REGEX='^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
+readonly SEMVER_REGEX='^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-((0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
 readonly RELEASE_VERSION="$1"
 readonly GH_CLI_URL='https://storage.googleapis.com/engflow-tools-public/github.com/cli/cli/releases/download/v2.52.0/gh_2.52.0_linux_amd64.tar.gz'
 readonly GH_CLI_EXPECTED_SHA256='3ea6ed8b2585f406a064cecd7e1501e58f56c8e7ca764ae1f3483d1b8ed68826'
@@ -67,7 +67,7 @@ echo "[FINISH] Downloading gh CLI"
 
 echo "[START]  Release branch checks"
 # Current commit must be on either `main` or the corresponding release branch
-readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(v[0-9]+.[0-9]+).[0-9]+|release/\1|' <<<${RELEASE_VERSION})"
+readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(^v[0-9]+\.[0-9]+)\..*$|release/\1|' <<<${RELEASE_VERSION})"
 if ! git branch \
   --contains "$(git rev-parse HEAD)" \
   | grep --quiet --extended-regexp "main|${EXPECTED_RELEASE_BRANCH}"; then
@@ -106,6 +106,10 @@ cp \
   "${ARTIFACTS_DIR}/engflow_auth_macos_arm64"
 
 cp \
+  bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_macos_x64 \
+  "${ARTIFACTS_DIR}/engflow_auth_macos_x64"
+
+cp \
   bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_windows_x64 \
   "${ARTIFACTS_DIR}/engflow_auth_windows_x64"
 echo "[FINISH] Staging artifacts"
@@ -117,5 +121,6 @@ ${GH_CLI} release create \
     --generate-notes \
     "${ARTIFACTS_DIR}/engflow_auth_linux_x64#engflow_auth (Linux, x64)" \
     "${ARTIFACTS_DIR}/engflow_auth_macos_arm64#engflow_auth (macOS, arm64)" \
+    "${ARTIFACTS_DIR}/engflow_auth_macos_x64#engflow_auth (macOS, x64)" \
     "${ARTIFACTS_DIR}/engflow_auth_windows_x64#engflow_auth (Windows, x64)"
 echo "[FINISH] Creating release"
