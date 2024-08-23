@@ -106,6 +106,10 @@ cp \
   "${ARTIFACTS_DIR}/engflow_auth_macos_arm64"
 
 cp \
+  bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_macos_x64 \
+  "${ARTIFACTS_DIR}/engflow_auth_macos_x64"
+
+cp \
   bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_windows_x64 \
   "${ARTIFACTS_DIR}/engflow_auth_windows_x64"
 echo "[FINISH] Staging artifacts"
@@ -117,5 +121,6 @@ ${GH_CLI} release create \
     --generate-notes \
     "${ARTIFACTS_DIR}/engflow_auth_linux_x64#engflow_auth (Linux, x64)" \
     "${ARTIFACTS_DIR}/engflow_auth_macos_arm64#engflow_auth (macOS, arm64)" \
+    "${ARTIFACTS_DIR}/engflow_auth_macos_x64#engflow_auth (macOS, x64)" \
     "${ARTIFACTS_DIR}/engflow_auth_windows_x64#engflow_auth (Windows, x64)"
 echo "[FINISH] Creating release"

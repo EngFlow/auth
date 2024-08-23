@@ -47,6 +47,13 @@ go_cross_binary(
 )
 
 go_cross_binary(
+    name = "engflow_auth_macos_x64",
+    platform = "@rules_go//go/toolchain:darwin_amd64_cgo",
+    target = ":engflow_auth",
+    visibility = RELEASE_ARTIFACT,
+)
+
+go_cross_binary(
     name = "engflow_auth_windows_x64",
     platform = "@rules_go//go/toolchain:windows_amd64_cgo",
     target = ":engflow_auth",
