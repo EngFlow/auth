@@ -15,8 +15,8 @@
 package oauthtoken
 
 import (
-	"context"
 	"fmt"
+	"io/fs"
 
 	"golang.org/x/oauth2"
 )
@@ -36,7 +36,7 @@ func NewFakeTokenStore() *FakeTokenStore {
 	}
 }
 
-func (f *FakeTokenStore) Load(ctx context.Context, cluster string) (*oauth2.Token, error) {
+func (f *FakeTokenStore) Load(cluster string) (*oauth2.Token, error) {
 	if f.LoadErr != nil {
 		return nil, f.LoadErr
 	}
@@ -47,7 +47,7 @@ func (f *FakeTokenStore) Load(ctx context.Context, cluster string) (*oauth2.Toke
 	return token, nil
 }
 
-func (f *FakeTokenStore) Store(ctx context.Context, cluster string, token *oauth2.Token) error {
+func (f *FakeTokenStore) Store(cluster string, token *oauth2.Token) error {
 	if f.StoreErr != nil {
 		return f.StoreErr
 	}
@@ -55,10 +55,33 @@ func (f *FakeTokenStore) Store(ctx context.Context, cluster string, token *oauth
 	return nil
 }
 
-func (f *FakeTokenStore) Delete(ctx context.Context, cluster string) error {
+func (f *FakeTokenStore) Delete(cluster string) error {
 	if f.DeleteErr != nil {
 		return f.DeleteErr
 	}
+	if _, ok := f.Tokens[cluster]; !ok {
+		return fs.ErrNotExist
+	}
 	delete(f.Tokens, cluster)
 	return nil
+}
+
+func (f *FakeTokenStore) WithToken(cluster string, token *oauth2.Token) *FakeTokenStore {
+	f.Tokens[cluster] = token
+	return f
+}
+
+func (f *FakeTokenStore) WithLoadErr(err error) *FakeTokenStore {
+	f.LoadErr = err
+	return f
+}
+
+func (f *FakeTokenStore) WithStoreErr(err error) *FakeTokenStore {
+	f.StoreErr = err
+	return f
+}
+
+func (f *FakeTokenStore) WithDeleteErr(err error) *FakeTokenStore {
+	f.DeleteErr = err
+	return f
 }

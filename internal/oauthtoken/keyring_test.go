@@ -15,11 +15,10 @@
 package oauthtoken
 
 import (
-	"context"
 	"errors"
+	"io/fs"
 	"testing"
 
-	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,34 +35,13 @@ func init() {
 	keyring.MockInit()
 }
 
-func TestKeyringTokenRoundtrip(t *testing.T) {
-	ctx := context.Background()
-	testKeyring := &Keyring{
-		username: "jmcclane",
-	}
-	cluster := "nakatomiplaza.cluster.engflow.com"
-	token := &oauth2.Token{
-		AccessToken: uuid.New().String(),
-	}
-	_, gotErr := testKeyring.Load(ctx, cluster)
-	require.Equal(t, autherr.ReauthRequired(cluster), gotErr)
-
-	gotErr = testKeyring.Store(ctx, cluster, token)
-	require.NoError(t, gotErr)
-
-	gotToken, gotErr := testKeyring.Load(ctx, cluster)
-	require.NoError(t, gotErr)
-	assert.Equal(t, gotToken, token)
-}
-
 func TestKeyringLoadError(t *testing.T) {
 	wantErr := errors.New("load_error")
 	keyring.MockInitWithError(wantErr)
 	t.Cleanup(keyring.MockInit)
-	ctx := context.Background()
 	testKeyring := &Keyring{username: "jmcclane"}
 	cluster := "nakatomiplaza.cluster.engflow.com"
-	_, gotErr := testKeyring.Load(ctx, cluster)
+	_, gotErr := testKeyring.Load(cluster)
 	require.ErrorIs(t, gotErr, wantErr)
 	require.ErrorContains(t, gotErr, "failed to look up token")
 }
@@ -72,13 +50,17 @@ func TestKeyringStoreError(t *testing.T) {
 	wantErr := errors.New("store_error")
 	keyring.MockInitWithError(wantErr)
 	t.Cleanup(keyring.MockInit)
-	ctx := context.Background()
 	testKeyring := &Keyring{username: "jmcclane"}
 	cluster := "nakatomiplaza.cluster.engflow.com"
 	token := &oauth2.Token{
 		AccessToken: uuid.New().String(),
 	}
-	gotErr := testKeyring.Store(ctx, cluster, token)
+	gotErr := testKeyring.Store(cluster, token)
 	require.ErrorIs(t, gotErr, wantErr)
 	require.ErrorContains(t, gotErr, "failed to store token")
+}
+
+func TestKeyringNotFoundError(t *testing.T) {
+	err := &keyringNotFoundError{user: "jmcclane", service: "nypd"}
+	assert.ErrorIs(t, err, fs.ErrNotExist)
 }

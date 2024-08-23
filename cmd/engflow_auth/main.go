@@ -19,10 +19,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -44,6 +47,9 @@ const (
 )
 
 type appState struct {
+	// These vars are initialized by `build()` iff they are not pre-populated;
+	// they should be pre-populated in tests and left nil otherwise.
+	userConfigDir string
 	browserOpener browser.Opener
 	authenticator oauthdevice.Authenticator
 	tokenStore    oauthtoken.LoadStorer
@@ -59,9 +65,66 @@ type ExportedToken struct {
 	Aliases []string `json:"aliases,omitempty"`
 }
 
-func (r *appState) get(cliCtx *cli.Context) error {
-	ctx := cliCtx.Context
+func (r *appState) build(cliCtx *cli.Context) error {
+	if r.userConfigDir == "" {
+		configDir, err := os.UserConfigDir()
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to discover user's config dir: %w", err)
+		}
+		r.userConfigDir = configDir
+	}
+	if r.authenticator == nil {
+		r.authenticator = oauthdevice.NewAuth(cliClientID, nil)
+	}
+	if r.browserOpener == nil {
+		r.browserOpener = &browser.StderrPrint{}
+	}
+	if r.tokenStore == nil {
+		keyring, err := oauthtoken.NewKeyring()
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open keyring-based token store: %w", err)
+		}
 
+		tokensDir := filepath.Join(r.userConfigDir, "engflow_auth", "tokens")
+		fileStore, err := oauthtoken.NewFileTokenStore(tokensDir)
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open file-based token store: %w", err)
+		}
+
+		errorStore := &oauthtoken.FakeTokenStore{
+			StoreErr: fmt.Errorf("subcommand attempted invalid write to token storage"),
+		}
+
+		var writeStore oauthtoken.LoadStorer
+		switch writeStoreName := cliCtx.String("store"); writeStoreName {
+		case "keyring":
+			writeStore = keyring
+		case "file":
+			writeStore = fileStore
+		case "":
+			// Subcommands that don't have this flag defined will cause the flag
+			// value fetch to return empty (as opposed to a sane default value).
+			// These commands shouldn't write to token storage (else they should
+			// define the flag) so the corresponding token storage object errors
+			// on writes.
+			writeStore = errorStore
+		default:
+			return autherr.CodedErrorf(autherr.CodeBadParams, "unknown token store type %q", writeStoreName)
+		}
+
+		r.tokenStore =
+			oauthtoken.NewCacheAlert(
+				oauthtoken.NewFallback(
+					/* gets Store() operations */ writeStore,
+					/* gets Load() operations */ keyring, fileStore,
+				),
+				cliCtx.App.ErrWriter,
+			)
+	}
+	return nil
+}
+
+func (r *appState) get(cliCtx *cli.Context) error {
 	if cliCtx.NArg() != 0 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected no positional args; got %d args: %v", cliCtx.NArg(), cliCtx.Args())
 	}
@@ -73,7 +136,7 @@ func (r *appState) get(cliCtx *cli.Context) error {
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to parse cluster URL %q from request: %w", req.URI, err)
 	}
-	token, err := r.tokenStore.Load(ctx, clusterURL.Host)
+	token, err := r.tokenStore.Load(clusterURL.Host)
 	if err != nil {
 		return autherr.ReauthRequired(clusterURL.Host)
 	}
@@ -94,8 +157,6 @@ func (r *appState) get(cliCtx *cli.Context) error {
 }
 
 func (r *appState) export(cliCtx *cli.Context) error {
-	ctx := cliCtx.Context
-
 	if cliCtx.NArg() != 1 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster host name; got %d arguments", cliCtx.NArg())
 	}
@@ -104,7 +165,7 @@ func (r *appState) export(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	token, err := r.tokenStore.Load(ctx, clusterURL.Host)
+	token, err := r.tokenStore.Load(clusterURL.Host)
 	if err != nil {
 		if reauthErr := (*autherr.CodedError)(nil); errors.As(err, &reauthErr) && reauthErr.Code == autherr.CodeReauthRequired {
 			return reauthErr
@@ -129,8 +190,6 @@ func (r *appState) export(cliCtx *cli.Context) error {
 }
 
 func (r *appState) import_(cliCtx *cli.Context) error {
-	ctx := cliCtx.Context
-
 	var token ExportedToken
 	if err := json.NewDecoder(cliCtx.App.Reader).Decode(&token); err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to unmarshal token data from stdin: %w", err)
@@ -148,7 +207,7 @@ func (r *appState) import_(cliCtx *cli.Context) error {
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(ctx, storeURL.Host, token.Token); err != nil {
+		if err := r.tokenStore.Store(storeURL.Host, token.Token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -230,7 +289,7 @@ Visit %s for help.`,
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(ctx, storeURL.Host, token); err != nil {
+		if err := r.tokenStore.Store(storeURL.Host, token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -261,7 +320,9 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	if err := r.tokenStore.Delete(cliCtx.Context, clusterURL.Host); err != nil {
+	if err := r.tokenStore.Delete(clusterURL.Host); errors.Is(err, fs.ErrNotExist) {
+		return &autherr.CodedError{Code: autherr.CodeBadParams, Err: fmt.Errorf("no credentials found for cluster %q", clusterURL.Host)}
+	} else if err != nil {
 		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
 	}
 	return nil
@@ -273,6 +334,23 @@ func (r *appState) version(cliCtx *cli.Context) error {
 }
 
 func makeApp(root *appState) *cli.App {
+	storeFlag := &cli.StringFlag{
+		Name:  "store",
+		Usage: "Name of backend that should be used for token store operations",
+		Value: "keyring",
+		Action: func(ctx *cli.Context, s string) error {
+			allowedStoreBackends := []string{"keyring", "file"}
+			if !slices.Contains(allowedStoreBackends, s) {
+				return autherr.CodedErrorf(autherr.CodeBadParams, "invalid value %q for --store. Allowed values: %v", s, allowedStoreBackends)
+			}
+			return nil
+		},
+	}
+	aliasFlag := &cli.StringSliceFlag{
+		Name:  "alias",
+		Usage: "Comma-separated list of alias hostnames for this cluster",
+	}
+
 	app := &cli.App{
 		Name:  "engflow_auth",
 		Usage: "Authenticate to EngFlow remote build clusters",
@@ -294,16 +372,12 @@ credential helper protocol.`),
 				Usage:     "Prints the currently-stored token for the specified cluster to stdout",
 				ArgsUsage: " CLUSTER_URL",
 				Action:    root.export,
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "alias",
-						Usage: "Comma-separated list of alias hostnames for this cluster",
-					},
-				},
+				Flags:     []cli.Flag{aliasFlag},
 			},
 			{
 				Name:   "import",
 				Usage:  "Imports a data blob containing auth token(s) exported via `engflow_auth export` from stdin",
+				Flags:  []cli.Flag{storeFlag},
 				Action: root.import_,
 			},
 			{
@@ -313,12 +387,7 @@ credential helper protocol.`),
 Initiates an interactive OAuth2 flow to log into the cluster at
 CLUSTER_URL.`),
 				Action: root.login,
-				Flags: []cli.Flag{
-					&cli.StringSliceFlag{
-						Name:  "alias",
-						Usage: "Comma-separated list of alias hostnames for this cluster",
-					},
-				},
+				Flags:  []cli.Flag{aliasFlag, storeFlag},
 			},
 			{
 				Name:      "logout",
@@ -334,10 +403,8 @@ Erases the credentials for the named cluster from the local machine.`),
 				Action: root.version,
 			},
 		},
-		Before: func(ctx *cli.Context) error {
-			// Exit non-zero if no subcommand is provided (CLI library will take
-			// care of printing the help message, if applicable)
-			if ctx.NArg() < 1 {
+		Before: func(cliCtx *cli.Context) error {
+			if cliCtx.NArg() < 1 {
 				return autherr.CodedErrorf(autherr.CodeUnknownSubcommand, "no subcommand provided; expected at least one subcommand")
 			}
 			return nil
@@ -348,6 +415,24 @@ Erases the credentials for the named cluster from the local machine.`),
 			// we will take care of calling os.Exit().
 		},
 	}
+
+	// Call root.build after command-line parsing for whichever subcommand gets
+	// called. We need to know the value of the -store flag (if defined).
+	// It's available when Command.Before is called but not App.Before.
+	for _, cmd := range app.Commands {
+		cmd.Before = root.build
+	}
+
+	// Ensure that all usage errors get an error code, for consistency with
+	// other error exit conditions.
+	usageErrWrapper := func(cliCtx *cli.Context, err error, isSubcommand bool) error {
+		return autherr.CodedErrorf(autherr.CodeBadParams, "%w", err)
+	}
+	app.OnUsageError = usageErrWrapper
+	for _, cmd := range app.Commands {
+		cmd.OnUsageError = usageErrWrapper
+	}
+
 	return app
 }
 
@@ -356,19 +441,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	deviceAuth := oauthdevice.NewAuth(cliClientID, nil)
-	browserOpener := &browser.StderrPrint{}
-	tokenStore, err := oauthtoken.NewKeyring()
-	if err != nil {
-		exitOnError(autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open token store: %w", err))
-	}
-	root := &appState{
-		browserOpener: browserOpener,
-		authenticator: deviceAuth,
-		tokenStore:    oauthtoken.NewCacheAlert(tokenStore, os.Stderr),
-	}
-
-	app := makeApp(root)
+	app := makeApp(&appState{})
 	exitOnError(app.RunContext(ctx, os.Args))
 }
 
@@ -419,7 +492,7 @@ func sanitizedURL(cluster string) (*url.URL, error) {
 	// - `Port` is optional, defaulting to whatever is implied by `Scheme`
 	// - All other fields are forbidden
 	if clusterURL.Scheme != "https" {
-		return nil, fmt.Errorf("illegal scheme %q; only 'https' is supported", clusterURL.Scheme)
+		return nil, fmt.Errorf("invalid scheme %q; only 'https' is supported", clusterURL.Scheme)
 	}
 	if clusterURL.Host == "" {
 		return nil, fmt.Errorf("cluster URL %q does not specify a host", clusterURL)

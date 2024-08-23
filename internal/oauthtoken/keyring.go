@@ -15,16 +15,28 @@
 package oauthtoken
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os/user"
 
-	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
+
+type keyringNotFoundError struct {
+	service string
+	user    string
+}
+
+func (e *keyringNotFoundError) Error() string {
+	return fmt.Sprintf("secret %q for user %q not found in keyring", e.service, e.user)
+}
+
+func (e *keyringNotFoundError) Is(err error) bool {
+	return err == fs.ErrNotExist
+}
 
 // Keyring stores a JWT token on the user's keyring via the OS-specific
 // keyring mechanism of the current platform.
@@ -44,12 +56,12 @@ func NewKeyring() (LoadStorer, error) {
 	}, nil
 }
 
-func (f *Keyring) Load(ctx context.Context, cluster string) (*oauth2.Token, error) {
+func (f *Keyring) Load(cluster string) (*oauth2.Token, error) {
 	serviceName := f.secretServiceName(cluster)
 	contents, err := keyring.Get(serviceName, f.username)
 	if err != nil {
 		if errors.Is(err, keyring.ErrNotFound) {
-			return nil, autherr.ReauthRequired(cluster)
+			return nil, &keyringNotFoundError{service: serviceName, user: f.username}
 		}
 		return nil, fmt.Errorf("failed to look up token for service %q: %w", serviceName, err)
 	}
@@ -61,7 +73,7 @@ func (f *Keyring) Load(ctx context.Context, cluster string) (*oauth2.Token, erro
 	return parsed, nil
 }
 
-func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token) error {
+func (f *Keyring) Store(cluster string, token *oauth2.Token) error {
 	serviceName := f.secretServiceName(cluster)
 	tokenStr, err := json.Marshal(token)
 	if err != nil {
@@ -76,10 +88,10 @@ func (f *Keyring) Store(ctx context.Context, cluster string, token *oauth2.Token
 	return nil
 }
 
-func (f *Keyring) Delete(ctx context.Context, cluster string) error {
+func (f *Keyring) Delete(cluster string) error {
 	serviceName := f.secretServiceName(cluster)
 	if err := keyring.Delete(serviceName, f.username); errors.Is(err, keyring.ErrNotFound) {
-		return nil
+		return &keyringNotFoundError{user: f.username, service: serviceName}
 	} else if err != nil {
 		return fmt.Errorf("failed to delete oauth2 token from keyring service %q: %w", serviceName, err)
 	}
