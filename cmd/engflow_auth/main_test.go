@@ -112,8 +112,11 @@ func TestRun(t *testing.T) {
 		tokenStore    oauthtoken.LoadStorer
 		browserOpener browser.Opener
 
-		wantCode             int
-		wantErr              string
+		wantCode int
+		wantErr  string
+		// If the command fails CLI flag/arg parsing, fill in wantUsageErr
+		// instead of wantErr.
+		wantUsageErr         string
 		wantStdoutContaining []string
 		wantStderrContaining []string
 		wantStored           []string
@@ -258,7 +261,7 @@ func TestRun(t *testing.T) {
 			desc:     "login with invalid scheme",
 			args:     []string{"login", "grpcs://cluster.example.com:8080"},
 			wantCode: autherr.CodeBadParams,
-			wantErr:  "illegal scheme",
+			wantErr:  "invalid scheme",
 		},
 		{
 			desc: "login code fetch failure",
@@ -337,14 +340,46 @@ func TestRun(t *testing.T) {
 			wantErr:  "token_store_fail",
 		},
 		{
+			desc: "login with file-backed token storage",
+			args: []string{"login", "--store=file", "cluster.example.com"},
+			authenticator: &fakeAuth{
+				res: &oauth2.DeviceAuthResponse{
+					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
+				},
+			},
+		},
+		{
+			desc: "login with keyring-backed token storage",
+			args: []string{"login", "--store=keyring", "cluster.example.com"},
+			authenticator: &fakeAuth{
+				res: &oauth2.DeviceAuthResponse{
+					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
+				},
+			},
+		},
+		{
+			desc:     "login with empty token storage type",
+			args:     []string{"login", "--store=", "cluster.example.com"},
+			wantCode: autherr.CodeBadParams,
+			wantErr:  `invalid value "" for --store`,
+		},
+		{
+			desc:     "login with misplaced store flag",
+			args:     []string{"--store=file", "login", "cluster.example.com"},
+			wantCode: autherr.CodeBadParams,
+			wantErr:  "flag provided but not defined",
+		},
+		{
 			desc:     "logout without cluster",
 			args:     []string{"logout"},
 			wantCode: autherr.CodeBadParams,
 			wantErr:  "expected exactly 1 positional argument",
 		},
 		{
-			desc: "logout with unknown cluster",
-			args: []string{"logout", "unknown.example.com"},
+			desc:     "logout with unknown cluster",
+			args:     []string{"logout", "unknown.example.com"},
+			wantCode: autherr.CodeBadParams,
+			wantErr:  "no credentials found for cluster",
 		},
 		{
 			desc: "logout with cluster",
@@ -374,7 +409,7 @@ func TestRun(t *testing.T) {
 			desc:     "export with invalid cluster URL",
 			args:     []string{"export", "grpcs://cluster.example.com:8080"},
 			wantCode: autherr.CodeBadParams,
-			wantErr:  "illegal scheme",
+			wantErr:  "invalid scheme",
 		},
 		{
 			desc: "export when token not found",
