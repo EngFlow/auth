@@ -21,7 +21,7 @@
 set -o nounset -o pipefail -o errexit
 [[ "${SCRIPT_DEBUG:-"off"}" == "on" ]] && set -o xtrace
 
-if [[ -z "${ARCH}" ]]; then
+if [[ -z "${ARCH:-}" ]]; then
   echo "ARCH not set"
   exit 1
 fi
@@ -50,7 +50,10 @@ else
 fi
 readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth${ENGFLOW_AUTH_EXT}"
 mkdir -p "${TOOLS_DIR}"
-curl --location --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}"
+if ! curl --fail-with-body --location --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}"; then
+  cat "${ENGFLOW_AUTH_PATH}" >&2
+  exit 1
+fi
 chmod +x "${ENGFLOW_AUTH_PATH}"
 
 # Import the credential.

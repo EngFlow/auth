@@ -121,6 +121,10 @@ jobs:
       - "engflow-runner-id=${{ github.repository_id }}_golang-builder-ci-runners_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
 
+    env:
+      ARCH: "x64"
+      OS: "linux"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -149,8 +153,8 @@ jobs:
     timeout-minutes: 10
 
     env:
-      ARCH: "${{ matrix.arch }}"
-      OS: "${{ matrix.os }}"
+      ARCH: "x64"
+      OS: "linux"
 
     steps:
       - uses: actions/checkout@v4
