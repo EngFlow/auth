@@ -16,7 +16,7 @@ This repository provides `engflow_auth`, a [Bazel credential helper](https://blo
    ```
 
    would configure the credential helper correctly when `--config=engflow` is
-   passed to a bazel invocation. See [Bazel's config
+   passed to a bazel invocation. You may remove existing `--tls_client_certificate`, `--tls_client_key`, and `--remote_header` flags for this cluster. See [Bazel's config
    documentation](https://bazel.build/run/bazelrc) for more info on bazelrc
    files, and [EngFlow setup
    documentation](https://docs.engflow.com/re/client/bazel-first-time.html#4-set-up-bazelrc)
