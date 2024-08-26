@@ -7,7 +7,13 @@ This repository provides `engflow_auth`, a [Bazel credential helper](https://blo
 1. Download the appropriate binary from the latest [release
    page](https://github.com/EngFlow/auth/releases/latest).
 1. Copy the downloaded binary to a directory on the system `$PATH` and mark as
-   executable (if necessary).
+   executable (if necessary). On macOS, you may also need to remove the quarantine flag.
+
+   ```bash
+   chmod +x engflow_auth
+   [ "$(uname)" != Darwin ] || xattr -d com.apple.quarantine engflow_auth
+   ```
+
 1. In the `.bazelrc` file of either your project or user, add a line that sets `--credential_helper` for your cluster. For
    instance:
 
@@ -29,7 +35,7 @@ This repository provides `engflow_auth`, a [Bazel credential helper](https://blo
 
 This process needs to be repeated after the credential expires, typically every 90 days.
 
-## Use in a non-interactive environment
+## Use in a non-interactive environment (CI)
 
 You can use `engflow_auth` to authenticate when no web browser is available, for example, on a continuous integration and testing server.
 
@@ -58,6 +64,8 @@ You can use `engflow_auth` to authenticate when no web browser is available, for
     ```bash
     engflow_auth logout [CLUSTER URL]
     ```
+
+For an example, see this repository's own configuration. [main.yml](/blob/main/.github/workflows/main.yml) grants access to the secret. [login.sh](/blob/main/infra/login.sh) obtains and imports a credential. [logout.sh](/blob/main/infra/logout.sh) removes it.
 
 ## Build from source
 
