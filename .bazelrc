@@ -23,3 +23,24 @@ build:noninteractive --keep_going
 
 build:release --config=noninteractive
 build:release --stamp
+
+build:engflow_common --jobs=40
+build:engflow_common --define=EXECUTOR=remote
+build:engflow_common --experimental_inmemory_dotd_files
+build:engflow_common --experimental_inmemory_jdeps_files
+build:engflow_common --incompatible_strict_action_env=true
+build:engflow_common --remote_timeout=600
+build:engflow_common --legacy_important_outputs=false
+build:engflow_common --grpc_keepalive_time=30s
+build:engflow_common --experimental_remote_cache_compression=true
+build:engflow_common --remote_instance_name=auth
+build:engflow_common --bes_instance_name=auth
+build:engflow_common --bes_lifecycle_events
+
+build:opal --config=engflow_common
+build:opal --bes_backend=grpcs://opal.cluster.engflow.com
+build:opal --bes_results_url=https://opal.cluster.engflow.com/invocations/auth/
+# TODO(CUS-349): enable remote execution
+
+# Load authentication flags for the remote service, if any.
+try-import .bazelrc.user
