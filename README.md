@@ -36,26 +36,26 @@ You can use `engflow_auth` to authenticate when no web browser is available, for
 1. You may wish to create a service account with your authentication provider, then log into your EngFlow cluster with that account. The credential created here will let Bazel authenticate as this account.
 1. On a machine with a web browser, complete the login process as described above:
 
-    ```
+    ```bash
     engflow_auth login [CLUSTER URL]
     ```
 
-1. Export the credential to a file using the command below:
+1. Export the credential to stdout using the command below:
 
-    ```
-    engflow_auth export [CLUSTER URL] >cred.json
+    ```bash
+    engflow_auth export [CLUSTER URL]
     ```
 
 1. Save this credential as a secret, accessible in the non-interactive environment. For example, if you're using GitHub Actions, you can save this as a GitHub secret, then grant access in workflows that need it.
-1. At the beginning of a job, retrieve the secret and import it using the command below. The `-store=file` flag may be necessary to store the credential as an unencrypted file instead of your encrypted keyring. Non-interactive environments typically don't have an encrypted keyring.
+1. At the beginning of a job, retrieve the secret and import it on stdin using the command below. The `-store=file` flag may be necessary to store the credential as an unencrypted file instead of your encrypted keyring. Non-interactive environments typically don't have an encrypted keyring.
 
-    ```
-    engflow_auth import -store=file <cred.json
+    ```bash
+    engflow_auth import -store=file <<<"${ENGFLOW_CRED}"
     ```
 
 1. At the end of a job, remove the credential using the command below.
 
-    ```
+    ```bash
     engflow_auth logout [CLUSTER URL]
     ```
 
@@ -63,19 +63,19 @@ You can use `engflow_auth` to authenticate when no web browser is available, for
 
 To build `engflow_auth` with Bazel, clone this repository then run:
 
-```
+```bash
 bazel build //cmd/engflow_auth
 ```
 
 To build and install `engflow_auth` with Go:
 
-```
+```bash
 go install github.com/EngFlow/auth/cmd/engflow_auth@latest
 ```
 
 To build release artifacts:
 
-```
+```bash
 bazel build --config=release //:release_artifacts
 ```
 
