@@ -302,11 +302,14 @@ Visit %s for help.`,
 		)
 	}
 
+	// Bazel on Windows rejects paths with backslashes like C:\foo in .bazelrc.
+	// Print a path with forward slashes instead.
+	cmdPath := filepath.ToSlash(os.Args[0])
 	fmt.Fprintf(
 		cliCtx.App.ErrWriter,
 		"Successfully saved credentials for %[1]s.\nTo use, ensure the line below is in your .bazelrc:\n\n\tbuild --credential_helper=%[1]s=%s\n",
 		clusterURL.Hostname(),
-		os.Args[0])
+		cmdPath)
 
 	return nil
 }
