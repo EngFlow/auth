@@ -33,6 +33,11 @@ type Auth struct {
 	config *oauth2.Config
 }
 
+const (
+	codeChallengeMethodParamName = "code_challenge_method"
+	codeChallengeMethodName      = "S256"
+)
+
 func NewAuth(clientID string, scopes []string) *Auth {
 	return &Auth{
 		config: &oauth2.Config{
@@ -44,7 +49,13 @@ func NewAuth(clientID string, scopes []string) *Auth {
 
 func (a *Auth) FetchCode(ctx context.Context, authEndpoint *oauth2.Endpoint) (*oauth2.DeviceAuthResponse, error) {
 	a.config.Endpoint = *authEndpoint
-	res, err := a.config.DeviceAuth(ctx)
+	// Use Golang's native version, but could probably use this approach for higher entropy
+	// https://github.com/grafana/grafana/pull/80511/files
+	verifier := oauth2.GenerateVerifier()
+	codeChallenge := oauth2.VerifierOption(verifier)
+	codeChallengeMethod := oauth2.SetAuthURLParam(codeChallengeMethodParamName, codeChallengeMethodName)
+
+	res, err := a.config.DeviceAuth(ctx, codeChallenge, codeChallengeMethod)
 	if err != nil {
 		if oauthErr := (*oauth2.RetrieveError)(nil); errors.As(err, &oauthErr) {
 			return nil, err
