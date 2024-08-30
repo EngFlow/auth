@@ -60,7 +60,7 @@ jobs:
         run: |
           bazel test \
             --config=noninteractive \
-            --config=opal \
+            --config=engflow \
             --config=remote_linux_x64 \
             //...
 
