@@ -108,8 +108,8 @@ jobs:
         shell: bash
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive --config=opal_bes_only @rules_go//go -- test ./...
-          bazel run --config=noninteractive --config=opal_bes_only @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- clean -cache -modcache
 
       - name: Log out
         shell: bash
@@ -140,8 +140,8 @@ jobs:
         if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive --config=opal_bes_only @rules_go//go -- test ./...
-          bazel run --config=noninteractive --config=opal_bes_only @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- clean -cache -modcache
 
       - name: Log out
         run: infra/logout.sh
@@ -170,7 +170,7 @@ jobs:
       - name: Check copyright headers
         if: success()
         run: |
-          bazel run --config=noninteractive --config=opal_bes_only //infra/internal/check_copyright_headers
+          bazel run --config=noninteractive --config=engflow_bes //infra/internal/check_copyright_headers
 
       - name: Log out
         run: infra/logout.sh

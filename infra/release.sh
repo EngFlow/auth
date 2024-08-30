@@ -81,7 +81,7 @@ echo "[START]  Building artifacts"
 BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
     bazel build \
     --config=release \
-    --config=opal \
+    --config=engflow \
     --config=remote_linux_x64 \
     -- \
     //:release_artifacts

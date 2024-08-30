@@ -51,22 +51,18 @@ build:engflow_common --remote_timeout=600
 build:engflow_common --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:engflow_common --grpc_keepalive_time=30s
 build:engflow_common --experimental_remote_cache_compression=true
-build:engflow_common --remote_instance_name=auth
-build:engflow_common --bes_instance_name=auth
-build:engflow_common --bes_lifecycle_events
 
-build:opal_bes --bes_backend=grpcs://opal.cluster.engflow.com
-build:opal_bes --bes_results_url=https://opal.cluster.engflow.com/invocations/auth/
+build:engflow_bes --bes_backend=grpcs://opal.cluster.engflow.com
+build:engflow_bes --bes_results_url=https://opal.cluster.engflow.com/invocations/auth/
+build:engflow_bes --bes_instance_name=auth
+build:engflow_bes --bes_lifecycle_events
 
-build:opal_bes_only --config=engflow_common
-build:opal_bes_only --config=opal_auth
-build:opal_bes_only --config=opal_bes
+build:engflow --config=engflow_common
+build:engflow --config=engflow_bes
+build:engflow --remote_executor=grpcs://opal.cluster.engflow.com
+build:engflow --remote_instance_name=auth
 
-build:opal --config=engflow_common
-build:opal --config=opal_auth
-build:opal --config=opal_bes
-build:opal --remote_executor=grpcs://opal.cluster.engflow.com
-
-# To authenticate with the clusters above, create a .bazelrc.user file.
-# This file is not checked into Git because it refers to local file system paths.
+# To authenticate with the clusters above, either add flags to this
+# .bazelrc.user file or to your $HOME/.bazelrc. These files may contain
+# credentials and local file system paths, so they're not checked in.
 try-import .bazelrc.user
