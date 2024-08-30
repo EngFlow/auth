@@ -26,7 +26,6 @@ permissions:
   contents: write
 
 jobs:
-  # TODO(OND-616): use remote execution and caching for all CI Runner jobs.
   release:
     runs-on:
       - self-hosted
