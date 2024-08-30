@@ -39,8 +39,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in
+        run: infra/login.sh
+
       - name: release
+        if: success()
         run: |
           infra/release.sh "${{ inputs.version }}"
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Log out
+        run: infra/logout.sh
