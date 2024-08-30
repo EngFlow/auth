@@ -1,4 +1,5 @@
 bazel-*
+.bazelrc.user
 
 # TODO(CUS-389): This file seems to thrash contents between builds (possibly due
 # to VSCode extension behavior). Ignore changes until we can better understand

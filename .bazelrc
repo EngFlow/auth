@@ -51,6 +51,7 @@ build:engflow_common --remote_timeout=600
 build:engflow_common --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:engflow_common --grpc_keepalive_time=30s
 build:engflow_common --experimental_remote_cache_compression=true
+build:engflow_common --remote_download_minimal
 
 build:engflow_bes --bes_backend=grpcs://opal.cluster.engflow.com
 build:engflow_bes --bes_results_url=https://opal.cluster.engflow.com/invocations/auth/
