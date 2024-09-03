@@ -17,6 +17,8 @@ package autherr
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 const (
@@ -56,6 +58,7 @@ func CodedErrorf(code int, format string, args ...any) error {
 func ReauthRequired(cluster string) error {
 	const reauthMessage = "Missing/invalid/expired credentials for cluster: %s\n" +
 		"Please refresh credentials by running:\n\n\t" +
-		"engflow_auth login %s\n"
-	return CodedErrorf(CodeReauthRequired, reauthMessage, cluster, cluster)
+		"%s login %s\n"
+	cmdPath := filepath.ToSlash(os.Args[0])
+	return CodedErrorf(CodeReauthRequired, reauthMessage, cluster, cmdPath, cluster)
 }
