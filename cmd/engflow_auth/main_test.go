@@ -30,13 +30,12 @@ import (
 	"github.com/EngFlow/auth/internal/oauthdevice"
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/stretchr/testify/assert"
-	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
 
 func init() {
 	// Tests should not interact with the user's real keyring.
-	keyring.MockInit()
+	oauthtoken.KeyringMockInit()
 }
 
 func codedErrorContains(t *testing.T, gotErr error, code int, wantMsg string) bool {

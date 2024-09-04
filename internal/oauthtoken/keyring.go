@@ -25,6 +25,15 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// KeyringMockInit initializes this package so that its methods may be called
+// from a test without reading or writing external state.
+func KeyringMockInit() {
+	mockUsername = "test"
+	keyring.MockInit()
+}
+
+var mockUsername string = ""
+
 type keyringNotFoundError struct {
 	service string
 	user    string
@@ -47,12 +56,16 @@ type Keyring struct {
 var _ LoadStorer = (*Keyring)(nil)
 
 func NewKeyring() (LoadStorer, error) {
-	u, err := user.Current()
-	if err != nil {
-		return nil, err
+	username := mockUsername
+	if username == "" {
+		u, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+		username = u.Username
 	}
 	return &Keyring{
-		username: u.Username,
+		username: username,
 	}, nil
 }
 

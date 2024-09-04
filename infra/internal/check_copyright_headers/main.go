@@ -30,7 +30,7 @@ var (
 	skipRegexps = []*regexp.Regexp{
 		regexp.MustCompile(`^go\.mod$`),
 		regexp.MustCompile(`^go\.sum$`),
-		regexp.MustCompile(`^LICENSE$`),
+		regexp.MustCompile(`(^|/)LICENSE$`),
 		regexp.MustCompile(`^MODULE\.bazel\.lock$`),
 		regexp.MustCompile(`^MODULE\.bazel$`),
 		regexp.MustCompile(`^README.md$`),
@@ -40,6 +40,8 @@ var (
 		regexp.MustCompile(`^\.bazelversion$`),
 		regexp.MustCompile(`^\.gitignore$`),
 		regexp.MustCompile(`\.bzl$`),
+		regexp.MustCompile(`^platform/linux_x64/builtin_include_directory_paths`),
+		regexp.MustCompile(`^platform/linux_x64/module.modulemap`),
 	}
 	copyrightRegexp = regexp.MustCompile(`^(#|//) Copyright [0-9-]+ EngFlow Inc\.`)
 )

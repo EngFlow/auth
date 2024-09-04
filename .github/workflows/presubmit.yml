@@ -30,12 +30,10 @@ env:
   # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CLUSTER_HOST: opal.cluster.engflow.com
-  CLUSTER_CONFIG: opal
   CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  # TODO(OND-616): use remote execution and caching for all CI Runner jobs.
   bazel-builder:
     runs-on:
       - self-hosted
@@ -45,7 +43,7 @@ jobs:
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
       - "engflow-runner-id=${{ github.repository_id }}_bazel-builder_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
-    timeout-minutes: 10
+    timeout-minutes: 30
 
     env:
       ARCH: "x64"
@@ -60,8 +58,11 @@ jobs:
       - name: Run all tests
         if: success()
         run: |
-          # TODO(CUS-345): Enable remote execution
-          bazel test --config=noninteractive --config="${CLUSTER_CONFIG}" //...
+          bazel test \
+            --config=noninteractive \
+            --config=engflow \
+            --config=remote_linux_x64 \
+            //...
 
       - name: Log out
         run: infra/logout.sh
@@ -107,8 +108,8 @@ jobs:
         shell: bash
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- test ./...
-          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- clean -cache -modcache
 
       - name: Log out
         shell: bash
@@ -139,8 +140,8 @@ jobs:
         if: success()
         run: |
           # TODO(CUS-345): Enable remote execution
-          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- test ./...
-          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" @rules_go//go -- clean -cache -modcache
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- test ./...
+          bazel run --config=noninteractive --config=engflow_bes @rules_go//go -- clean -cache -modcache
 
       - name: Log out
         run: infra/logout.sh
@@ -169,7 +170,7 @@ jobs:
       - name: Check copyright headers
         if: success()
         run: |
-          bazel run --config=noninteractive --config="${CLUSTER_CONFIG}" //infra/internal/check_copyright_headers
+          bazel run --config=noninteractive --config=engflow_bes //infra/internal/check_copyright_headers
 
       - name: Log out
         run: infra/logout.sh
