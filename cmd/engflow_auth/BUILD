@@ -65,3 +65,10 @@ go_cross_binary(
     target = ":engflow_auth",
     visibility = RELEASE_ARTIFACT,
 )
+
+go_cross_binary(
+    name = "engflow_auth_linux_arm64",
+    platform = "@rules_go//go/toolchain:linux_arm64_cgo",
+    target = ":engflow_auth",
+    visibility = RELEASE_ARTIFACT,
+)

@@ -65,14 +65,18 @@ if [[ "${GH_CLI_ACTUAL_SHA256}" != "${GH_CLI_EXPECTED_SHA256}" ]]; then
 fi
 echo "[FINISH] Downloading gh CLI"
 
+# If this is a release version (not a prerelease), the commit must be on main or
+# the correct release branch (e.g., release/v1.2). This constraint doesn't apply
+# to prereleases so we can test this workflow.
 echo "[START]  Release branch checks"
-# Current commit must be on either `main` or the corresponding release branch
-readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(^v[0-9]+\.[0-9]+)\..*$|release/\1|' <<<${RELEASE_VERSION})"
-if ! git branch \
-  --contains "$(git rev-parse HEAD)" \
-  | grep --quiet --extended-regexp "main|${EXPECTED_RELEASE_BRANCH}"; then
-    echo "Commit $(git rev-parse HEAD) is not on main or release branch ${EXPECTED_RELEASE_BRANCH}; exiting"
-    exit 1
+if [[ "${RELEASE_VERSION}" != *-* ]]; then
+  readonly EXPECTED_RELEASE_BRANCH="$(sed --regexp-extended 's|(^v[0-9]+\.[0-9]+)\..*$|release/\1|' <<<${RELEASE_VERSION})"
+  if ! git branch \
+    --contains "$(git rev-parse HEAD)" \
+    | grep --quiet --extended-regexp "main|${EXPECTED_RELEASE_BRANCH}"; then
+      echo "Commit $(git rev-parse HEAD) is not on main or release branch ${EXPECTED_RELEASE_BRANCH}; exiting"
+      exit 1
+  fi
 fi
 echo "[FINISH] Release branch checks"
 
@@ -100,6 +104,10 @@ echo "[FINISH] Building artifacts"
 # temp dir.
 echo "[START]  Staging artifacts"
 cp \
+  bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_linux_arm64 \
+  "${ARTIFACTS_DIR}/engflow_auth_linux_arm64"
+
+cp \
   bazel-out/k8-fastbuild-ST-*/bin/cmd/engflow_auth/engflow_auth_linux_x64 \
   "${ARTIFACTS_DIR}/engflow_auth_linux_x64"
 
@@ -121,6 +129,7 @@ echo "[START]  Creating release"
 ${GH_CLI} release create \
     "${RELEASE_VERSION}" \
     --generate-notes \
+    "${ARTIFACTS_DIR}/engflow_auth_linux_arm64#engflow_auth (Linux, arm64)" \
     "${ARTIFACTS_DIR}/engflow_auth_linux_x64#engflow_auth (Linux, x64)" \
     "${ARTIFACTS_DIR}/engflow_auth_macos_arm64#engflow_auth (macOS, arm64)" \
     "${ARTIFACTS_DIR}/engflow_auth_macos_x64#engflow_auth (macOS, x64)" \
