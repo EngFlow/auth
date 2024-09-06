@@ -73,7 +73,9 @@ else
   readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth"
 fi
 mkdir -p "${TOOLS_DIR}"
-if ! curl --fail-with-body --location --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}"; then
+HTTP_STATUS=$(curl --location --write-out "%{http_code}" --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}")
+if [[ "${HTTP_STATUS}" != 200 ]]; then
+  echo "curl failed with status ${HTTP_STATUS}:" >&2
   cat "${ENGFLOW_AUTH_PATH}" >&2
   exit 1
 fi
