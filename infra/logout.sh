@@ -24,9 +24,13 @@ if [[ -z "${CLUSTER_HOST:-}" ]]; then
   echo "CLUSTER_HOST not set"
   exit 1
 fi
+if [[ -z "${OS:-}" ]]; then
+  echo "OS not set"
+  exit 1
+fi
 
 readonly TOOLS_DIR=$(pwd)/_tools
-if [[ -f "${TOOLS_DIR}/engflow_auth.exe" ]]; then
+if [[ "${OS}" == "windows" ]]; then
   readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth.exe"
 else
   readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth"

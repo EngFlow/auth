@@ -22,17 +22,8 @@ set -o nounset -o pipefail -o errexit
 [[ "${SCRIPT_DEBUG:-"off"}" == "on" ]] && set -o xtrace
 
 if [[ -z "${ARCH:-}" ]]; then
-  case "$(uname -m)" in
-  aarch64|arm64)
-    export ARCH=arm64
-    ;;
-  x86_64)
-    export ARCH=x64
-    ;;
-  *)
-    echo >&2 "ARCH not set, and 'uname -m' returned unknown value $(uname -m)"
-    exit 1
-  esac
+  echo "ARCH not set"
+  exit 1
 fi
 if [[ -z "${CLUSTER_HOST:-}" ]]; then
   echo "CLUSTER_HOST not set"
@@ -43,25 +34,13 @@ if [[ -z "${CRED_HELPER_TOKEN:-}" ]]; then
   exit 1
 fi
 if [[ -z "${OS:-}" ]]; then
-  case "$(uname)" in
-  Darwin)
-    export OS=macos
-    ;;
-  Linux)
-    export OS=linux
-    ;;
-  MSYS*)
-    export OS=windows
-    ;;
-  *)
-    echo >&2 "OS not set, and 'uname' returned unknown value $(uname)"
-    exit 1
-  esac
+  echo "OS not set"
+  exit 1
 fi
 
 # Download a recent version of engflow_auth to a local directory,
 # then use it to import the credential.
-readonly ENGFLOW_AUTH_VERSION=v0.0.7
+readonly ENGFLOW_AUTH_VERSION=v0.0.6
 readonly TOOLS_DIR=$(pwd)/_tools
 readonly ENGFLOW_AUTH_URL="https://github.com/EngFlow/auth/releases/download/${ENGFLOW_AUTH_VERSION}/engflow_auth_${OS}_${ARCH}"
 if [[ "${OS}" == "windows" ]]; then
@@ -73,9 +52,7 @@ else
   readonly ENGFLOW_AUTH_PATH="${TOOLS_DIR}/engflow_auth"
 fi
 mkdir -p "${TOOLS_DIR}"
-HTTP_STATUS=$(curl --location --write-out "%{http_code}" --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}")
-if [[ "${HTTP_STATUS}" != 200 ]]; then
-  echo "curl failed with status ${HTTP_STATUS}:" >&2
+if ! curl --fail-with-body --location --output "${ENGFLOW_AUTH_PATH}" "${ENGFLOW_AUTH_URL}"; then
   cat "${ENGFLOW_AUTH_PATH}" >&2
   exit 1
 fi
