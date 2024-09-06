@@ -32,6 +32,7 @@ permissions:
 env:
   # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  DRY_RUN: ${{ inputs.dry_run }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:

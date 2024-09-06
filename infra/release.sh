@@ -123,6 +123,10 @@ cp \
 echo "[FINISH] Staging artifacts"
 
 # Create release
+if [[ "${DRY_RUN}" == true ]]; then
+  echo "[SKIP]   Creating release"
+  exit 0
+fi
 echo "[START]  Creating release"
 ${GH_CLI} release create \
     "${RELEASE_VERSION}" \
