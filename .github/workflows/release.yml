@@ -21,9 +21,17 @@ on:
         type: string
         description: Version of engflow_auth to release; must be a semver version string, starting with `v`
         required: true
+      dry_run:
+        type: boolean
+        description: If true, all artifacts are built, but no release is created.
+        required: true
 
 permissions:
   contents: write
+
+env:
+  CLUSTER_HOST: glass.cluster.engflow.com
+  CRED_HELPER_TOKEN: ${{ secrets.GLASS_CRED_HELPER_TOKEN }}
 
 jobs:
   release:
