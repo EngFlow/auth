@@ -23,15 +23,18 @@ on:
         required: true
       dry_run:
         type: boolean
-        description: If true, all artifacts are built, but no release is created.
+        description: "Dry run: if checked, all artifacts are built, but no release is created."
         required: true
 
 permissions:
   contents: write
 
 env:
+  # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
+  BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   CLUSTER_HOST: glass.cluster.engflow.com
-  CRED_HELPER_TOKEN: ${{ secrets.GLASS_CRED_HELPER_TOKEN }}
+  CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   release:
@@ -55,8 +58,6 @@ jobs:
         if: success()
         run: |
           infra/release.sh "${{ inputs.version }}"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Log out
         run: infra/logout.sh
