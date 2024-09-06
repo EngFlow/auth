@@ -32,8 +32,6 @@ permissions:
 env:
   # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  CLUSTER_HOST: glass.cluster.engflow.com
-  CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
@@ -51,13 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in
-        run: infra/login.sh
-
       - name: release
         if: success()
         run: |
           infra/release.sh "${{ inputs.version }}"
-
-      - name: Log out
-        run: infra/logout.sh

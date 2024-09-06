@@ -85,8 +85,6 @@ echo "[START]  Building artifacts"
 BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
     bazel build \
     --config=release \
-    --config=engflow \
-    --config=remote_linux_x64 \
     -- \
     //:release_artifacts
 echo "[FINISH] Building artifacts"
