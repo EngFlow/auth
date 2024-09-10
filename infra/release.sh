@@ -85,8 +85,6 @@ echo "[START]  Building artifacts"
 BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
     bazel build \
     --config=release \
-    --config=engflow \
-    --config=remote_linux_x64 \
     -- \
     //:release_artifacts
 echo "[FINISH] Building artifacts"
@@ -125,6 +123,10 @@ cp \
 echo "[FINISH] Staging artifacts"
 
 # Create release
+if [[ "${DRY_RUN}" == true ]]; then
+  echo "[SKIP]   Creating release"
+  exit 0
+fi
 echo "[START]  Creating release"
 ${GH_CLI} release create \
     "${RELEASE_VERSION}" \

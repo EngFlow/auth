@@ -21,9 +21,19 @@ on:
         type: string
         description: Version of engflow_auth to release; must be a semver version string, starting with `v`
         required: true
+      dry_run:
+        type: boolean
+        description: "Dry run: if checked, all artifacts are built, but no release is created."
+        required: true
 
 permissions:
   contents: write
+
+env:
+  # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
+  BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  DRY_RUN: ${{ inputs.dry_run }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   release:
@@ -31,7 +41,7 @@ jobs:
       - self-hosted
       - os=linux
       - arch=x64
-      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian11-dind-x64@sha256:604855f1ecd6edad3f45f513ed0112b9e8e32589871133767a1a51944b07f487"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
       - "engflow-runner-id=${{ github.repository_id }}_release_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
@@ -40,15 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in
-        run: infra/login.sh
-
       - name: release
         if: success()
         run: |
           infra/release.sh "${{ inputs.version }}"
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Log out
-        run: infra/logout.sh
