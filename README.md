@@ -53,10 +53,11 @@ You can use `engflow_auth` to authenticate when no web browser is available, for
     ```
 
 1. Save this credential as a secret, accessible in the non-interactive environment. For example, if you're using GitHub Actions, you can save this as a GitHub secret, then grant access in workflows that need it.
-1. At the beginning of a job, retrieve the secret and import it on stdin using the command below. The `-store=file` flag may be necessary to store the credential as an unencrypted file instead of your encrypted keyring. Non-interactive environments typically don't have an encrypted keyring.
+1. Non-interactive environments typically don't have an encrypted keyring. When this is the case, you can store the secret as an unencrypted file and create an env variable pointing to the file location, e.g., `ENGFLOW_CRED_FILE`
+1. At the beginning of a job, retrieve the secret and import it on stdin using the command below. The `-store=file` flag is necessary if you store the credential as an unencrypted file instead of your encrypted keyring.
 
     ```bash
-    engflow_auth import -store=file <<<"${ENGFLOW_CRED}"
+    engflow_auth import -store=file <<<$(cat $ENGFLOW_CRED_FILE)
     ```
 
 1. At the end of a job, remove the credential using the command below.
