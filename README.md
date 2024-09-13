@@ -56,8 +56,9 @@ You can use `engflow_auth` to authenticate when no web browser is available, for
 1. At the beginning of a job, retrieve the secret and import it on stdin using the command below. The `-store=file` flag may be necessary to store the credential as an unencrypted file instead of your encrypted keyring. Non-interactive environments typically don't have an encrypted keyring.
 
     ```bash
-    engflow_auth import -store=file <<<"${ENGFLOW_CRED}"
+    engflow_auth import -store=file <<<'${ENGFLOW_CRED}'
     ```
+   Replace `${ENGFLOW_CRED}` with the credential exported previously.
 
 1. At the end of a job, remove the credential using the command below.
 
