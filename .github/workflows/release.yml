@@ -87,7 +87,7 @@ jobs:
       
       - name: Build release artifacts
         if: success()
-        run: infra/build-release-artifacts.sh
+        run: infra/release-build.sh
 
       - uses: actions/upload-artifact@v4
         if: success()
@@ -133,7 +133,7 @@ jobs:
       
       - name: Build release artifacts
         if: success()
-        run: infra/build-release-artifacts.sh
+        run: infra/release-build.sh
 
       - uses: actions/upload-artifact@v4
         if: success()
