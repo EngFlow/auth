@@ -52,10 +52,6 @@ if [[ "${GH_CLI_ACTUAL_SHA256}" != "${GH_CLI_EXPECTED_SHA256}" ]]; then
 fi
 echo "[FINISH] Downloading gh CLI"
 
-if [[ "${DRY_RUN}" == true ]]; then
-  echo "[SKIP]   Creating release"
-  exit 0
-fi
 RELEASE_ARGS=()
 for file in $(find "${ARTIFACTS_DIR}" -type f); do
   os=$(echo "$file" | sed -E -e 's,^.*_([^_]*)_[^_]*$,\1,' -e 's,macos,macOS,' -e 's,windows,Windows,')
@@ -63,6 +59,14 @@ for file in $(find "${ARTIFACTS_DIR}" -type f); do
   arg="${file}#engflow_auth (${os}, ${arch})"
   RELEASE_ARGS+=("${arg}")
 done
+if [[ "${DRY_RUN}" == true ]]; then
+  echo "Release arguments:"
+  for arg in "${RELEASE_ARGS[@]}"; do
+    echo "${arg}"
+  done
+  echo "[SKIP]   Creating release"
+  exit 0
+fi
 "${GH_CLI}" release create \
   "${RELEASE_VERSION}" \
   --generate-notes \
