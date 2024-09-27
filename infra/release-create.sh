@@ -38,7 +38,6 @@ trap 'cleanup' EXIT
 # TODO(CUS-353): Remove this after installing Github CLI in the self-hosted
 # environment (run via Docker?)
 echo "[START]  Downloading gh CLI"
-readonly GH_CLI_DIR="$(mktemp -d -t 'gh_cli_XXXXXXXX')"
 curl --silent --location "${GH_CLI_URL}" \
   | tee >(sha256sum - > "${GH_CLI_DIR}/archive_checksum.txt") \
   | tar \
@@ -46,12 +45,10 @@ curl --silent --location "${GH_CLI_URL}" \
       --strip-components 1 \
       -xzf \
       -
-trap 'cleanup' EXIT
-readonly GH_CLI="${GH_CLI_DIR}/bin/gh"
 readonly GH_CLI_ACTUAL_SHA256="$(cat ${GH_CLI_DIR}/archive_checksum.txt | awk '{ print $1 }')"
 if [[ "${GH_CLI_ACTUAL_SHA256}" != "${GH_CLI_EXPECTED_SHA256}" ]]; then
-    echo "SHA256 for Github CLI tarball ${GH_CLI_ACTUAL_SHA256} doesn't match expected value ${GH_CLI_ACTUAL_SHA256}; exiting"
-    exit 1
+  echo "SHA256 for Github CLI tarball ${GH_CLI_ACTUAL_SHA256} doesn't match expected value ${GH_CLI_ACTUAL_SHA256}; exiting"
+  exit 1
 fi
 echo "[FINISH] Downloading gh CLI"
 
