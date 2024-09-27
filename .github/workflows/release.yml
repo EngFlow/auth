@@ -125,15 +125,22 @@ jobs:
             arch: "x64"
             os_distribution: "server"
             os_version: "2022"
+
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Log in
         run: infra/login.sh
+        shell: bash
       
       - name: Build release artifacts
         if: success()
         run: infra/release-build.sh
+        shell: bash
 
       - uses: actions/upload-artifact@v4
         if: success()
@@ -145,3 +152,4 @@ jobs:
       
       - name: Log out
         run: infra/logout.sh
+        shell: bash

@@ -50,7 +50,7 @@ mkdir _out
 BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
     bazel build \
     --config=release \
-    --
+    -- \
     "${TARGETS[@]}"
 
 # TODO(REC-55): sign and notarize binaries on macOS, Windows
