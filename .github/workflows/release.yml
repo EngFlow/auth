@@ -33,9 +33,14 @@ env:
   # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   APPLE_CERT_BASE64: ${{ secrets.APPLE_DEV_CERT_BASE64 }}
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CLUSTER_HOST: opal.cluster.engflow.com
+  CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
   DRY_RUN: ${{ inputs.dry_run }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   RELEASE_VERSION: ${{ inputs.version }}
+
+  # DO NOT SUBMIT
+  SCRIPT_DEBUG: "on"
 
 jobs:
   check-version:
