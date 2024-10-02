@@ -21,6 +21,7 @@ go_library(
 go_binary(
     name = "engflow_auth",
     embed = [":engflow_auth_lib"],
+    pure = "on",
     visibility = ["//visibility:public"],
 )
 
