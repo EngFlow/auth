@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/exec"
+	"runtime"
 )
 
 type Opener interface {
@@ -26,11 +28,36 @@ type Opener interface {
 
 type StderrPrint struct{}
 
+func openURL(url string) error {
+	var err error
+	switch runtime.GOOS {
+	case "darwin": // macOS
+		err = exec.Command("open", url).Start()
+	case "linux":
+		providers := []string{"xdg-open", "x-www-browser", "www-browser"}
+
+		// There are multiple possible providers to open a browser on linux
+		// One of them is xdg-open, another is x-www-browser, then there's www-browser, etc.
+		// Look for one that exists and run it
+		for _, provider := range providers {
+			if _, err := exec.LookPath(provider); err == nil {
+				err = exec.Command(provider, url).Start()
+			}
+		}
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	return err
+}
+
 func (p *StderrPrint) Open(u *url.URL) error {
 	fmt.Fprintf(
-		os.Stderr,
-		"Please open the following URL in your web browser to authenticate:\n\n\t%s\n\n",
+		os.Stdout,
+		"Opening the following URL in your web browser to authenticate:\n\n\t%s\n\n",
 		u,
 	)
+	openURL(u.String())
 	return nil
 }

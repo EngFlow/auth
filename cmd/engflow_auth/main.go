@@ -47,7 +47,7 @@ const (
 )
 
 type appState struct {
-	// These vars are initialized by `build()` iff they are not pre-populated;
+	// These vars are initialized by `build()` if they are not pre-populated;
 	// they should be pre-populated in tests and left nil otherwise.
 	userConfigDir string
 	browserOpener browser.Opener
