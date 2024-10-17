@@ -62,6 +62,6 @@ If the browser does not open or you wish to use a different device to authorize 
 		%s`,
 		u,
 	)
-	openURL(u.String())
+	_ = openURL(u.String())
 	return nil
 }
