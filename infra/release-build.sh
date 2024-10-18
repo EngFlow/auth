@@ -21,10 +21,45 @@ if [[ -z "${OS:-}" ]]; then
   echo >&2 "OS not set"
   exit 1
 fi
+if [[ "${OS}" == "macos" -a -z "${APPLE_CERT_BASE64:-}"]]; then
+  echo >&2 "APPLE_CERT_BASE64 not set"
+  exit 1
+fi
 if [[ -z "${RELEASE_VERSION:-}" ]]; then
   echo >&2 "RELEASE_VERSION not set"
   exit 1
 fi
+
+install_cert () {
+  if [[ "${OS}" != 'macos' ]]; then
+    return
+  fi
+  # Files in $RUNNER_TEMP are automatically removed on completion.
+  local p12_path="${RUNNER_TEMP}/build_certificate.p12"
+  base64 --decode <<<"${APPLE_CERT_BASE64}" >"${p12_path}"
+  local keychain_path="${RUNNER_TEMP}/dev.keychain"
+  security create-keychain -p '' "${keychain_path}"
+  security set-keychain-settings "${keychain_path}"
+  security unlock-keychain -p '' "${keychain_path}"
+  security import "${p12_path}" -P '' -A -t cert -f pkcs12 -k "${keychain_path}"
+  # Allow productsign to access the identity
+  security set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k '' "${keychain_path}"
+  # Overwrite the keychain search list with the new keychain
+  security list-keychain -d user -s "${keychain_path}"
+  security find-identity -v
+}
+
+uninstall_cert () {
+  if [[ "${OS}" != 'macos' ]]; then
+    return
+  fi
+  security list-keychains -s ~/Library/Keychains/login.keychain
+  security delete-keychain "${RUNNER_TEMP}/dev.keychain"
+}
+
+sign_binary () {
+  # TODO(REC-55): write this
+}
 
 case "${OS}" in
 macos)
@@ -52,6 +87,9 @@ BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
     --config=release \
     -- \
     "${TARGETS[@]}"
+
+install_cert
+trap EXIT uninstall_cert
 
 # TODO(REC-55): sign and notarize binaries on macOS, Windows
 
