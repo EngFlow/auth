@@ -59,6 +59,7 @@ uninstall_cert () {
 
 sign_binary () {
   # TODO(REC-55): write this
+  return
 }
 
 case "${OS}" in
