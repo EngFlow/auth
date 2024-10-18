@@ -54,7 +54,7 @@ install_cert () {
     echo >&2 "did not find exactly 1 identity"
     return 1
   fi
-  APPLE_CERT_ID=$(grep --extended-regexp --only '\b[0-9A-F]{40}\b' "${identities-path}")
+  APPLE_CERT_ID=$(grep --extended-regexp --only '\b[0-9A-F]{40}\b' "${identities_path}")
   echo >&2 "Installed certificate with identity ${APPLE_CERT_ID}"
 }
 
