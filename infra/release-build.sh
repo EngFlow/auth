@@ -68,7 +68,7 @@ uninstall_cert () {
 
 sign_and_notarize_binary () {
   local binary_path="$1"
-  if [[ "${OS}" != 'macos' ]]; thne
+  if [[ "${OS}" != 'macos' ]]; then
     return
   fi
   codesign -s "${APPLE_CERT_ID}" -o runtime -v "${binary_path}"
