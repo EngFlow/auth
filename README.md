@@ -30,7 +30,7 @@ This repository provides `engflow_auth`, a [Bazel credential helper](https://blo
 
 ## Use
 
-1. Run `engflow_auth login [CLUSTER URL]` to obtain a credential. This prints a URL to visit in your browser.
+1. Run `engflow_auth login [CLUSTER URL]` to obtain a credential. This opens a URL in your browser.
 1. Visit the URL to complete the process, logging in if necessary. `engflow_auth` will download and store a credential in on your system's encrypted keyring.
 
 This process needs to be repeated after the credential expires, typically every 90 days.
