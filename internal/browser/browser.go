@@ -59,7 +59,10 @@ func (p *StderrPrint) Open(u *url.URL) error {
 		os.Stderr,
 		`Attempting to automaticaly open the authentication URL in your web browser.
 If the browser does not open or you wish to use a different device to authorize this request, open the following URL:
-		%s`,
+
+	%s
+
+`,
 		u,
 	)
 	_ = openURL(u.String())
