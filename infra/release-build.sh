@@ -43,7 +43,8 @@ install_cert () {
   security unlock-keychain -p '' "${keychain_path}"
   security import "${p12_path}" -P '' -A -t cert -f pkcs12 -k "${keychain_path}"
   # Allow productsign to access the identity
-  security set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k '' "${keychain_path}"
+  # This prints some info from the keychain, not sure if it's sensitive.
+  security >/dev/null set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k '' "${keychain_path}"
   # Overwrite the keychain search list with the new keychain
   security list-keychain -d user -s "${keychain_path}"
   security find-identity -v
