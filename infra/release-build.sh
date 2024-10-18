@@ -30,6 +30,7 @@ if [[ -z "${RELEASE_VERSION:-}" ]]; then
   exit 1
 fi
 
+APPLE_CERT_ID=
 install_cert () {
   if [[ "${OS}" != 'macos' ]]; then
     return
@@ -47,7 +48,14 @@ install_cert () {
   security >/dev/null set-key-partition-list -S apple-tool:,apple:,codesign:,productsign: -s -k '' "${keychain_path}"
   # Overwrite the keychain search list with the new keychain
   security list-keychain -d user -s "${keychain_path}"
-  security find-identity -v
+  local identities_path="${RUNNER_TEMP}/identities.txt"
+  security find-identity -v | tee "${identities_path}"
+  if ! grep --quiet '1 valid identities found' "${identities_path}"; then
+    echo >&2 "did not find exactly 1 identity"
+    return 1
+  fi
+  APPLE_CERT_ID=$(grep --extended-regexp --only '\b[0-9A-F]{40}\b' "${identities-path}")
+  echo >&2 "Installed certificate with identity ${APPLE_CERT_ID}"
 }
 
 uninstall_cert () {
@@ -58,8 +66,13 @@ uninstall_cert () {
   security delete-keychain "${RUNNER_TEMP}/dev.keychain"
 }
 
-sign_binary () {
-  # TODO(REC-55): write this
+sign_and_notarize_binary () {
+  local binary_path="$1"
+  if [[ "${OS}" != 'macos' ]]; thne
+    return
+  fi
+  codesign -s "${APPLE_CERT_ID}" -o runtime -v "${binary_path}"
+  # TODO(REC-55): implement notarization; implement windows.
   return
 }
 
@@ -96,5 +109,7 @@ trap EXIT uninstall_cert
 # TODO(REC-55): sign and notarize binaries on macOS, Windows
 
 for target in "${TARGETS[@]}"; do
-  cp "$(bazel cquery --output=files "${target}")" _out/
+  target_file=$(bazel cquery --output=files "${target}")
+  sign_and_notarize_binary "${target_file}"
+  cp "${target_file}" _out/
 done
