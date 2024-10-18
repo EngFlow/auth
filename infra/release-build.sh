@@ -104,7 +104,7 @@ BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
     "${TARGETS[@]}"
 
 install_cert
-trap EXIT uninstall_cert
+trap uninstall_cert EXIT
 
 # TODO(REC-55): sign and notarize binaries on macOS, Windows
 
