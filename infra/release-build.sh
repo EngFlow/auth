@@ -67,12 +67,7 @@ uninstall_cert () {
 }
 
 sign_and_notarize_binary () {
-  local binary_path="$1"
-  if [[ "${OS}" != 'macos' ]]; then
-    return
-  fi
-  codesign -s "${APPLE_CERT_ID}" -o runtime -v "${binary_path}"
-  # TODO(REC-55): implement notarization; implement windows.
+  # TODO(REC-55): implement signing and notarization for macOS and Windows.
   return
 }
 
@@ -105,8 +100,6 @@ BUILD_RELEASE_VERSION="${RELEASE_VERSION}" \
 
 install_cert
 trap uninstall_cert EXIT
-
-# TODO(REC-55): sign and notarize binaries on macOS, Windows
 
 for target in "${TARGETS[@]}"; do
   target_file=$(bazel cquery --output=files "${target}")
