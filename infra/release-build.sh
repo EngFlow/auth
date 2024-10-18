@@ -21,7 +21,7 @@ if [[ -z "${OS:-}" ]]; then
   echo >&2 "OS not set"
   exit 1
 fi
-if [[ "${OS}" == "macos" -a -z "${APPLE_CERT_BASE64:-}"]]; then
+if [[ "${OS}" == 'macos' && -z "${APPLE_CERT_BASE64:-}" ]]; then
   echo >&2 "APPLE_CERT_BASE64 not set"
   exit 1
 fi
