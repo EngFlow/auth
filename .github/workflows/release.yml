@@ -51,7 +51,7 @@ jobs:
       - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
-      - "engflow-runner-id=${{ github.repository_id }}_bazel-builder_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+      - "engflow-runner-id=${{ github.repository_id }}_check-version_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 1
 
     steps:
@@ -70,7 +70,7 @@ jobs:
       - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
-      - "engflow-runner-id=${{ github.repository_id }}_bazel-builder_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+      - "engflow-runner-id=${{ github.repository_id }}_build-linux-artifacts_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
     needs:
       - check-version
@@ -78,13 +78,13 @@ jobs:
     env:
       ARCH: "x64"
       OS: "linux"
-    
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Log in
         run: infra/login.sh
-      
+
       - name: Build release artifacts
         if: success()
         run: infra/release-build.sh
@@ -96,7 +96,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
-      
+
       - name: Log out
         run: infra/logout.sh
 
@@ -136,7 +136,7 @@ jobs:
       - name: Log in
         run: infra/login.sh
         shell: bash
-      
+
       - name: Build release artifacts
         if: success()
         run: infra/release-build.sh
@@ -149,7 +149,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
           overwrite: true
-      
+
       - name: Log out
         run: infra/logout.sh
         shell: bash
@@ -162,7 +162,7 @@ jobs:
       - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
-      - "engflow-runner-id=${{ github.repository_id }}_bazel-builder_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+      - "engflow-runner-id=${{ github.repository_id }}_create-release_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
     needs:
       - build-other-artifacts
