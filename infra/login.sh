@@ -61,7 +61,7 @@ fi
 
 # Download a recent version of engflow_auth to a local directory,
 # then use it to import the credential.
-readonly ENGFLOW_AUTH_VERSION=v0.0.7
+readonly ENGFLOW_AUTH_VERSION=v0.0.8
 readonly TOOLS_DIR=$(pwd)/_tools
 readonly ENGFLOW_AUTH_URL="https://github.com/EngFlow/auth/releases/download/${ENGFLOW_AUTH_VERSION}/engflow_auth_${OS}_${ARCH}"
 if [[ "${OS}" == "windows" ]]; then
