@@ -30,13 +30,37 @@ permissions:
   contents: write
 
 env:
+  # TODO(REC-55): use real certificate.
+  APPLE_CERT_BASE64: ${{ secrets.APPLE_DEV_CERT_BASE64 }}
   # Recommended here: https://github.com/bazelbuild/bazelisk/issues/88#issuecomment-625178467
   BAZELISK_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CLUSTER_HOST: opal.cluster.engflow.com
+  CRED_HELPER_TOKEN: ${{ secrets.OPAL_CRED_HELPER_TOKEN }}
   DRY_RUN: ${{ inputs.dry_run }}
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  RELEASE_VERSION: ${{ inputs.version }}
 
 jobs:
-  release:
+  check-version:
+    runs-on:
+      - self-hosted
+      - os=linux
+      - arch=x64
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-pool=ci_sysbox_x64"
+      - "engflow-runtime=sysbox-runc"
+      - "engflow-runner-id=${{ github.repository_id }}_check-version_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+    timeout-minutes: 1
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: infra/release-check.sh
+
+  build-linux-artifacts:
+    # Linux is separate because we execute with CI runners, which don't support
+    # macOS or Windows yet. We use a Debian 11 image because binaries built on
+    # newer versions are incompatible with older version due to the libc runtime
+    # dependency.
     runs-on:
       - self-hosted
       - os=linux
@@ -44,13 +68,108 @@ jobs:
       - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian11-dind-x64@sha256:604855f1ecd6edad3f45f513ed0112b9e8e32589871133767a1a51944b07f487"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
-      - "engflow-runner-id=${{ github.repository_id }}_release_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+      - "engflow-runner-id=${{ github.repository_id }}_build-linux-artifacts_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
     timeout-minutes: 10
+    needs:
+      - check-version
+
+    env:
+      ARCH: "x64"
+      OS: "linux"
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: release
+      - name: Log in
+        run: infra/login.sh
+
+      - name: Build release artifacts
         if: success()
-        run: |
-          infra/release.sh "${{ inputs.version }}"
+        run: infra/release-build.sh
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          path: _out
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Log out
+        run: infra/logout.sh
+
+  build-other-artifacts:
+    runs-on:
+      - self-hosted
+      - "os=${{ matrix.os }}"
+      - "arch=${{ matrix.arch }}"
+      - "os_distribution=${{ matrix.os_distribution }}"
+      - "os_version=${{ matrix.os_version }}"
+      - "revision=d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
+    timeout-minutes: 10
+    needs:
+      - check-version
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: "macos"
+            arch: "arm64"
+            os_distribution: "monterey"
+            os_version: "12"
+
+          - os: "windows"
+            arch: "x64"
+            os_distribution: "server"
+            os_version: "2022"
+
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in
+        run: infra/login.sh
+        shell: bash
+
+      - name: Build release artifacts
+        if: success()
+        run: infra/release-build.sh
+        shell: bash
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          path: _out
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Log out
+        run: infra/logout.sh
+        shell: bash
+
+  create-release:
+    runs-on:
+      - self-hosted
+      - os=linux
+      - arch=x64
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-pool=ci_sysbox_x64"
+      - "engflow-runtime=sysbox-runc"
+      - "engflow-runner-id=${{ github.repository_id }}_create-release_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
+    timeout-minutes: 10
+    needs:
+      - build-other-artifacts
+      - build-linux-artifacts
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: _out
+          merge-multiple: true
+      - run: infra/release-create.sh
