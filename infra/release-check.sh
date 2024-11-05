@@ -22,8 +22,10 @@ if [[ -z "${RELEASE_VERSION:-}" ]]; then
   exit 1
 fi
 
-# Taken from https://semver.org/, with a `v` prepended
-readonly SEMVER_REGEX='^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-((0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
+# Taken from https://semver.org/,
+# prepended 'v', required by Go;
+# replaced \d with [0-9] for compatibility with grep regex flavor.
+readonly SEMVER_REGEX='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*)(\.(0|[1-9][0-9]*|[0-9]*[a-zA-Z-][0-9a-zA-Z-]*))*))?(\+([0-9a-zA-Z-]+(\.[0-9a-zA-Z-]+)*))?$'
 
 # Supplied version string must follow semver
 if ! grep --quiet --extended-regexp "${SEMVER_REGEX}" <<<${RELEASE_VERSION}; then
