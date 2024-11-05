@@ -106,5 +106,5 @@ trap uninstall_cert EXIT
 for target in "${TARGETS[@]}"; do
   target_file=$(bazel cquery --output=files "${target}")
   sign_and_notarize_binary "${target_file}"
-  cp "${target_file}" "_out/${target_file}${EXT}"
+  cp "${target_file}" "_out/$(basename ${target_file})${EXT}"
 done
