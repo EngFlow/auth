@@ -79,13 +79,13 @@ jobs:
             arch: "x64"
             os_distribution: "monterey"
             os_version: "12"
-            revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
+            revision: "1ec247a1e93f4980098fc6bb2764bb093b37b3da"
 
           - os: "windows"
             arch: "x64"
             os_distribution: "server"
             os_version: "2022"
-            revision: "d04e89854b3931f4aaced77aa3a2fcad5834b3a6"
+            revision: "1ec247a1e93f4980098fc6bb2764bb093b37b3da"
 
     env:
       ARCH: "${{ matrix.arch }}"
