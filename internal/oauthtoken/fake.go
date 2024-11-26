@@ -17,7 +17,9 @@ package oauthtoken
 import (
 	"fmt"
 	"io/fs"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 )
 
@@ -71,6 +73,10 @@ func (f *FakeTokenStore) WithToken(cluster string, token *oauth2.Token) *FakeTok
 	return f
 }
 
+func (f *FakeTokenStore) WithTokenForSubject(cluster, subject string) *FakeTokenStore {
+	return f.WithToken(cluster, NewFakeTokenForSubject(subject))
+}
+
 func (f *FakeTokenStore) WithLoadErr(err error) *FakeTokenStore {
 	f.LoadErr = err
 	return f
@@ -84,4 +90,26 @@ func (f *FakeTokenStore) WithStoreErr(err error) *FakeTokenStore {
 func (f *FakeTokenStore) WithDeleteErr(err error) *FakeTokenStore {
 	f.DeleteErr = err
 	return f
+}
+
+func NewFakeTokenForSubject(subject string) *oauth2.Token {
+	now := time.Now()
+	expiry := now.Add(time.Hour)
+	payload := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
+		Issuer:    "engflow unit tests",
+		Subject:   subject,
+		Audience:  nil,
+		ExpiresAt: jwt.NewNumericDate(expiry),
+		NotBefore: jwt.NewNumericDate(now),
+		IssuedAt:  jwt.NewNumericDate(now),
+	})
+	tokenStr, err := payload.SignedString([]byte("some signing key"))
+	if err != nil {
+		panic(err)
+	}
+	return &oauth2.Token{
+		AccessToken: tokenStr,
+		TokenType:   "Bearer",
+		Expiry:      expiry,
+	}
 }

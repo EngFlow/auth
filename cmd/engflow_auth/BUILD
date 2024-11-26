@@ -3,7 +3,10 @@ load("//infra:visibility.bzl", "RELEASE_ARTIFACT")
 
 go_library(
     name = "engflow_auth_lib",
-    srcs = ["main.go"],
+    srcs = [
+        "main.go",
+        "tokens.go",
+    ],
     importpath = "github.com/EngFlow/auth/cmd/engflow_auth",
     visibility = ["//visibility:private"],
     deps = [
@@ -13,6 +16,7 @@ go_library(
         "//internal/oauthdevice",
         "//internal/oauthtoken",
         "@com_github_engflow_credential_helper_go//:credential-helper-go",
+        "@com_github_golang_jwt_jwt_v5//:jwt",
         "@com_github_urfave_cli_v2//:cli",
         "@org_golang_x_oauth2//:oauth2",
     ],
