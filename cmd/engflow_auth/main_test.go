@@ -126,7 +126,7 @@ func TestRun(t *testing.T) {
 		wantUsageErr         string
 		wantStdoutContaining []string
 		wantStderrContaining []string
-		wantStored           []string
+		checkState           func(t *testing.T, root *appState)
 	}{
 		{
 			desc:     "no subcommand",
@@ -227,6 +227,14 @@ func TestRun(t *testing.T) {
 			wantStdoutContaining: []string{`"x-engflow-auth-token"`},
 		},
 		{
+			desc:                 "get from file does not call keyring",
+			args:                 []string{"get"},
+			machineInput:         strings.NewReader(`{"uri": "https://cluster.example.com"}`),
+			keyringStore:         oauthtoken.NewFakeTokenStore().WithPanic("do not call"),
+			fileStore:            oauthtoken.NewFakeTokenStore().WithTokenForSubject("cluster.example.com", "alice"),
+			wantStdoutContaining: []string{`"x-engflow-auth-token"`},
+		},
+		{
 			desc: "version prints build metadata",
 			args: []string{"version"},
 			// The output of `version` depends on whether stamping is enabled,
@@ -265,9 +273,12 @@ func TestRun(t *testing.T) {
 					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
 				},
 			},
-			wantStored: []string{
-				"cluster.example.com",
-				"cluster.local.example.com",
+			checkState: func(t *testing.T, root *appState) {
+				checkTokenStoreContains(
+					t,
+					root.keyringStore,
+					"cluster.example.com",
+					"cluster.local.example.com")
 			},
 		},
 		{
@@ -419,6 +430,33 @@ func TestRun(t *testing.T) {
 			wantStderrContaining: []string{"Login identity has changed"},
 		},
 		{
+			desc: "login with keyring deletes file",
+			args: []string{"login", "cluster.example.com"},
+			authenticator: &fakeAuth{
+				deviceResponse: &oauth2.DeviceAuthResponse{
+					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
+				},
+				token: oauthtoken.NewFakeTokenForSubject("alice"),
+			},
+			fileStore: oauthtoken.NewFakeTokenStore().WithTokenForSubject("cluster.example.com", "alice"),
+			checkState: func(t *testing.T, root *appState) {
+				if _, err := root.fileStore.Load("cluster.example.com"); err == nil {
+					t.Error("token was not deleted from file store")
+				}
+			},
+		},
+		{
+			desc: "login with file should not call keyring",
+			args: []string{"login", "-store=file", "cluster.example.com"},
+			authenticator: &fakeAuth{
+				deviceResponse: &oauth2.DeviceAuthResponse{
+					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
+				},
+				token: oauthtoken.NewFakeTokenForSubject("alice"),
+			},
+			keyringStore: oauthtoken.NewFakeTokenStore().WithPanic("do not call"),
+		},
+		{
 			desc:     "logout without cluster",
 			args:     []string{"logout"},
 			wantCode: autherr.CodeBadParams,
@@ -539,8 +577,8 @@ func TestRun(t *testing.T) {
 			args:         []string{"import"},
 			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
 			keyringStore: oauthtoken.NewFakeTokenStore(),
-			wantStored: []string{
-				"cluster.example.com",
+			checkState: func(t *testing.T, root *appState) {
+				checkTokenStoreContains(t, root.keyringStore, "cluster.example.com")
 			},
 		},
 		{
@@ -548,9 +586,12 @@ func TestRun(t *testing.T) {
 			args:         []string{"import"},
 			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com","aliases":["cluster.local.example.com"]}`),
 			keyringStore: oauthtoken.NewFakeTokenStore(),
-			wantStored: []string{
-				"cluster.example.com",
-				"cluster.local.example.com",
+			checkState: func(t *testing.T, root *appState) {
+				checkTokenStoreContains(
+					t,
+					root.keyringStore,
+					"cluster.example.com",
+					"cluster.local.example.com")
 			},
 		},
 		{
@@ -569,6 +610,23 @@ func TestRun(t *testing.T) {
 			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"grpcs://cluster.example.com:8080"}`),
 			wantCode:     autherr.CodeBadParams,
 			wantErr:      "token data contains invalid cluster",
+		},
+		{
+			desc:         "import with keyring deletes file",
+			args:         []string{"import"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			fileStore:    oauthtoken.NewFakeTokenStore().WithTokenForSubject("cluster.example.com", "alice"),
+			checkState: func(t *testing.T, root *appState) {
+				if _, err := root.fileStore.Load("cluster.example.com"); err == nil {
+					t.Error("token was not deleted from file store")
+				}
+			},
+		},
+		{
+			desc:         "import with file should not call keyring",
+			args:         []string{"import", "-store=file"},
+			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
+			keyringStore: oauthtoken.NewFakeTokenStore().WithPanic("do not call"),
 		},
 	}
 	for _, tc := range testCases {
@@ -633,9 +691,18 @@ func TestRun(t *testing.T) {
 					t.Logf("\n====== BEGIN APP STDERR ======\n%s\n====== END APP STDERR ======\n\n", stderr.String())
 				}
 			}
-			if tokenStore, ok := tc.keyringStore.(*oauthtoken.FakeTokenStore); ok {
-				assert.Subset(t, tokenStore.Tokens, tc.wantStored)
+			if tc.checkState != nil {
+				tc.checkState(t, root)
 			}
 		})
+	}
+}
+
+func checkTokenStoreContains(t *testing.T, ts oauthtoken.LoadStorer, clusters ...string) {
+	for _, cluster := range clusters {
+		_, err := ts.Load(cluster)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 }

@@ -28,6 +28,7 @@ import (
 type FakeTokenStore struct {
 	Tokens                       map[string]*oauth2.Token
 	LoadErr, StoreErr, DeleteErr error
+	PanicValue                   any
 }
 
 var _ LoadStorer = (*FakeTokenStore)(nil)
@@ -39,6 +40,9 @@ func NewFakeTokenStore() *FakeTokenStore {
 }
 
 func (f *FakeTokenStore) Load(cluster string) (*oauth2.Token, error) {
+	if f.PanicValue != nil {
+		panic(f.PanicValue)
+	}
 	if f.LoadErr != nil {
 		return nil, f.LoadErr
 	}
@@ -50,6 +54,9 @@ func (f *FakeTokenStore) Load(cluster string) (*oauth2.Token, error) {
 }
 
 func (f *FakeTokenStore) Store(cluster string, token *oauth2.Token) error {
+	if f.PanicValue != nil {
+		panic(f.PanicValue)
+	}
 	if f.StoreErr != nil {
 		return f.StoreErr
 	}
@@ -58,6 +65,9 @@ func (f *FakeTokenStore) Store(cluster string, token *oauth2.Token) error {
 }
 
 func (f *FakeTokenStore) Delete(cluster string) error {
+	if f.PanicValue != nil {
+		panic(f.PanicValue)
+	}
 	if f.DeleteErr != nil {
 		return f.DeleteErr
 	}
@@ -89,6 +99,11 @@ func (f *FakeTokenStore) WithStoreErr(err error) *FakeTokenStore {
 
 func (f *FakeTokenStore) WithDeleteErr(err error) *FakeTokenStore {
 	f.DeleteErr = err
+	return f
+}
+
+func (f *FakeTokenStore) WithPanic(value any) *FakeTokenStore {
+	f.PanicValue = value
 	return f
 }
 
