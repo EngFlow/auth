@@ -50,11 +50,13 @@ const (
 type appState struct {
 	// These vars are initialized by `build()` if and only if they are not pre-populated;
 	// they should be pre-populated in tests and left nil otherwise.
-	userConfigDir string
-	browserOpener browser.Opener
-	authenticator oauthdevice.Authenticator
-	tokenStore    oauthtoken.LoadStorer
-	stderr        io.Writer
+	userConfigDir  string
+	browserOpener  browser.Opener
+	authenticator  oauthdevice.Authenticator
+	fileStore      oauthtoken.LoadStorer
+	keyringStore   oauthtoken.LoadStorer
+	writeFileStore bool
+	stderr         io.Writer
 }
 
 type ExportedToken struct {
@@ -81,42 +83,28 @@ func (r *appState) build(cliCtx *cli.Context) error {
 	if r.browserOpener == nil {
 		r.browserOpener = &browser.StderrPrint{}
 	}
-	if r.tokenStore == nil {
-		keyring, err := oauthtoken.NewKeyring()
-		if err != nil {
-			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open keyring-based token store: %w", err)
-		}
-
+	if r.fileStore == nil {
 		tokensDir := filepath.Join(r.userConfigDir, "engflow_auth", "tokens")
 		fileStore, err := oauthtoken.NewFileTokenStore(tokensDir)
 		if err != nil {
 			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open file-based token store: %w", err)
 		}
-
-		errorStore := &oauthtoken.FakeTokenStore{
-			StoreErr: fmt.Errorf("subcommand attempted invalid write to token storage"),
+		r.fileStore = fileStore
+	}
+	if r.keyringStore == nil {
+		keyringStore, err := oauthtoken.NewKeyring()
+		if err != nil {
+			return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to open keyring-based token store: %w", err)
 		}
-
-		var writeStore oauthtoken.LoadStorer
-		switch writeStoreName := cliCtx.String("store"); writeStoreName {
-		case "keyring":
-			writeStore = keyring
-		case "file":
-			writeStore = fileStore
-		case "":
-			// Subcommands that don't have this flag defined will cause the flag
-			// value fetch to return empty (as opposed to a sane default value).
-			// These commands shouldn't write to token storage (else they should
-			// define the flag) so the corresponding token storage object errors
-			// on writes.
-			writeStore = errorStore
-		default:
-			return autherr.CodedErrorf(autherr.CodeBadParams, "unknown token store type %q", writeStoreName)
-		}
-
-		r.tokenStore = oauthtoken.NewFallback(
-			/* gets Store() operations */ writeStore,
-			/* gets Load() operations */ keyring, fileStore)
+		r.keyringStore = keyringStore
+	}
+	switch writeStoreName := cliCtx.String("store"); writeStoreName {
+	case "", "keyring":
+		r.writeFileStore = false
+	case "file":
+		r.writeFileStore = true
+	default:
+		return autherr.CodedErrorf(autherr.CodeBadParams, "unknown token store type %q", writeStoreName)
 	}
 	r.stderr = cliCtx.App.ErrWriter
 	return nil

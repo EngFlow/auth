@@ -49,24 +49,6 @@ var testLoadStorers = []struct {
 		"file",
 		fileStoreForTest,
 	},
-	{
-		"keyring_primary",
-		func(t *testing.T) LoadStorer {
-			t.Helper()
-			a := keyringForTest(t)
-			b := fileStoreForTest(t)
-			return NewFallback(a, a, b)
-		},
-	},
-	{
-		"file_primary",
-		func(t *testing.T) LoadStorer {
-			t.Helper()
-			a := keyringForTest(t)
-			b := fileStoreForTest(t)
-			return NewFallback(b, a, b)
-		},
-	},
 }
 
 func TestTokenRoundTrip(t *testing.T) {
