@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net"
 	"net/url"
@@ -53,6 +54,7 @@ type appState struct {
 	browserOpener browser.Opener
 	authenticator oauthdevice.Authenticator
 	tokenStore    oauthtoken.LoadStorer
+	stderr        io.Writer
 }
 
 type ExportedToken struct {
@@ -112,15 +114,11 @@ func (r *appState) build(cliCtx *cli.Context) error {
 			return autherr.CodedErrorf(autherr.CodeBadParams, "unknown token store type %q", writeStoreName)
 		}
 
-		r.tokenStore =
-			oauthtoken.NewCacheAlert(
-				oauthtoken.NewFallback(
-					/* gets Store() operations */ writeStore,
-					/* gets Load() operations */ keyring, fileStore,
-				),
-				cliCtx.App.ErrWriter,
-			)
+		r.tokenStore = oauthtoken.NewFallback(
+			/* gets Store() operations */ writeStore,
+			/* gets Load() operations */ keyring, fileStore)
 	}
+	r.stderr = cliCtx.App.ErrWriter
 	return nil
 }
 
@@ -136,7 +134,7 @@ func (r *appState) get(cliCtx *cli.Context) error {
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "failed to parse cluster URL %q from request: %w", req.URI, err)
 	}
-	token, err := r.tokenStore.Load(clusterURL.Host)
+	token, err := r.loadToken(clusterURL.Host)
 	if err != nil {
 		return autherr.ReauthRequired(clusterURL.Host)
 	}
@@ -165,7 +163,7 @@ func (r *appState) export(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	token, err := r.tokenStore.Load(clusterURL.Host)
+	token, err := r.loadToken(clusterURL.Host)
 	if err != nil {
 		if reauthErr := (*autherr.CodedError)(nil); errors.As(err, &reauthErr) && reauthErr.Code == autherr.CodeReauthRequired {
 			return reauthErr
@@ -207,7 +205,7 @@ func (r *appState) import_(cliCtx *cli.Context) error {
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(storeURL.Host, token.Token); err != nil {
+		if err := r.storeToken(storeURL.Host, token.Token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -289,7 +287,7 @@ Visit %s for help.`,
 
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
-		if err := r.tokenStore.Store(storeURL.Host, token); err != nil {
+		if err := r.storeToken(storeURL.Host, token); err != nil {
 			storeErrs = append(storeErrs, fmt.Errorf("failed to save token for host %q: %w", storeURL.Host, err))
 		}
 	}
@@ -323,7 +321,7 @@ func (r *appState) logout(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 
-	if err := r.tokenStore.Delete(clusterURL.Host); errors.Is(err, fs.ErrNotExist) {
+	if err := r.deleteToken(clusterURL.Host); errors.Is(err, fs.ErrNotExist) {
 		return &autherr.CodedError{Code: autherr.CodeBadParams, Err: fmt.Errorf("no credentials found for cluster %q", clusterURL.Host)}
 	} else if err != nil {
 		return &autherr.CodedError{Code: autherr.CodeTokenStoreFailure, Err: err}
