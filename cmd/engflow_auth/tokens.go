@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/golang-jwt/jwt/v5"
@@ -27,22 +28,38 @@ import (
 // loadToken loads a token for the given cluster or returns an error equivalent
 // to fs.ErrNotExist if the token is not found in any store.
 //
+// NOTE(REC-110): loadToken attempts to load from the file store first, falling
+// back to the keyring if an unencrypted token is not found. On Linux, the
+// keyring library may try to prompt the user for a password, hanging forever
+// because stdin and stdout are not normally connected to a terminal. We should
+// avoid calling it at all if the token is not stored there.
+//
 // loadToken may contain logic specific to this app and should be called
 // by commands instead of calling LoadStorer.Load directly.
 func (r *appState) loadToken(cluster string) (*oauth2.Token, error) {
-	var errs []error
-	backends := []oauthtoken.LoadStorer{r.keyringStore, r.fileStore}
-	for _, backend := range backends {
-		token, err := backend.Load(cluster)
-		if err == nil {
+	token, fileErr := r.fileStore.Load(cluster)
+	if fileErr == nil {
+		return token, nil
+	}
+	var keyringErr error
+	if !r.writeFileStore {
+		token, keyringErr = r.keyringStore.Load(cluster)
+		if keyringErr == nil {
 			return token, nil
 		}
-		errs = append(errs, err)
 	}
-	return nil, fmt.Errorf("failed to load token from %d backend(s): %w", len(backends), errors.Join(errs...))
+	return nil, fmt.Errorf("failed to load token: %w", errors.Join(fileErr, keyringErr))
 }
 
 // storeToken stores a token for the given cluster in one of the backends.
+//
+// NOTE(REC-110): when -store=file is used, storeToken only writes to the file
+// store and ignores the keyring store. When -store=file is not used,
+// storedToken writes to the keyring store deletes then token from the file
+// store if present. On Linux, the keyring library may try to prompt the user
+// for a password, causing loadToken to hang forever when invoked later.
+// So if -store=file is used, we should avoid calling the keyring library,
+// now or in the future.
 //
 // storeToken may contain logic specific to this app and should be called
 // by commands instead of calling LoadStorer.Store directly. For example,
@@ -56,6 +73,9 @@ func (r *appState) storeToken(cluster string, token *oauth2.Token) error {
 	if r.writeFileStore {
 		return r.fileStore.Store(cluster, token)
 	} else {
+		if err := r.fileStore.Delete(cluster); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "warning: attempting to delete existing file token: %v", err)
+		}
 		return r.keyringStore.Store(cluster, token)
 	}
 }
@@ -105,19 +125,7 @@ func (r *appState) deleteToken(cluster string) error {
 		}
 	}
 	if err := errors.Join(nonNotFoundErrs...); err != nil {
-		return fmt.Errorf("failed to delete token from %d backend(s): %w", len(backends), err)
+		return fmt.Errorf("failed to delete token: %w", err)
 	}
-	return &multiBackendNotFoundError{backendsCount: len(backends)}
-}
-
-type multiBackendNotFoundError struct {
-	backendsCount int
-}
-
-func (m *multiBackendNotFoundError) Error() string {
-	return fmt.Sprintf("token for cluster not found after trying %d token storage backends", m.backendsCount)
-}
-
-func (m *multiBackendNotFoundError) Is(err error) bool {
-	return err == fs.ErrNotExist
+	return errors.Join(errs...)
 }
