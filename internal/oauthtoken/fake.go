@@ -26,9 +26,14 @@ import (
 // FakeTokenStore is a test implementation of LoadStorer that stores tokens in
 // memory instead of the system keychain.
 type FakeTokenStore struct {
-	Tokens                       map[string]*oauth2.Token
+	Tokens map[string]*oauth2.Token
+
+	// Error values to be returned by Load, Store, and Delete, if not nil.
 	LoadErr, StoreErr, DeleteErr error
-	PanicValue                   any
+
+	// Value to panic with in Load, Store, and Delete, if not nil.
+	// Used to test that a method is NOT called.
+	PanicValue any
 }
 
 var _ LoadStorer = (*FakeTokenStore)(nil)
