@@ -15,8 +15,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 
+	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 )
@@ -27,7 +30,16 @@ import (
 // loadToken may contain logic specific to this app and should be called
 // by commands instead of calling LoadStorer.Load directly.
 func (r *appState) loadToken(cluster string) (*oauth2.Token, error) {
-	return r.tokenStore.Load(cluster)
+	var errs []error
+	backends := []oauthtoken.LoadStorer{r.keyringStore, r.fileStore}
+	for _, backend := range backends {
+		token, err := backend.Load(cluster)
+		if err == nil {
+			return token, nil
+		}
+		errs = append(errs, err)
+	}
+	return nil, fmt.Errorf("failed to load token from %d backend(s): %w", len(backends), errors.Join(errs...))
 }
 
 // storeToken stores a token for the given cluster in one of the backends.
@@ -40,7 +52,12 @@ func (r *appState) storeToken(cluster string, token *oauth2.Token) error {
 	if err == nil {
 		r.warnIfSubjectChanged(cluster, oldToken, token)
 	}
-	return r.tokenStore.Store(cluster, token)
+
+	if r.writeFileStore {
+		return r.fileStore.Store(cluster, token)
+	} else {
+		return r.keyringStore.Store(cluster, token)
+	}
 }
 
 // warnIfSubjectChanged prints a warning on stderr if the new token belongs to
@@ -70,5 +87,37 @@ func (r *appState) warnIfSubjectChanged(cluster string, oldToken, newToken *oaut
 // deleteToken may contain logic specific to this app and should be called
 // by commands instead of calling LoadStorer.Delete directly.
 func (r *appState) deleteToken(cluster string) error {
-	return r.tokenStore.Delete(cluster)
+	var errs []error
+	// Don't bother to delete from storeBackend, which should also be present in
+	// loadBackends
+	backends := []oauthtoken.LoadStorer{r.keyringStore, r.fileStore}
+	for _, backend := range backends {
+		errs = append(errs, backend.Delete(cluster))
+	}
+
+	var nonNotFoundErrs []error
+	for _, err := range errs {
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			nonNotFoundErrs = append(nonNotFoundErrs, err)
+		}
+	}
+	if err := errors.Join(nonNotFoundErrs...); err != nil {
+		return fmt.Errorf("failed to delete token from %d backend(s): %w", len(backends), err)
+	}
+	return &multiBackendNotFoundError{backendsCount: len(backends)}
+}
+
+type multiBackendNotFoundError struct {
+	backendsCount int
+}
+
+func (m *multiBackendNotFoundError) Error() string {
+	return fmt.Sprintf("token for cluster not found after trying %d token storage backends", m.backendsCount)
+}
+
+func (m *multiBackendNotFoundError) Is(err error) bool {
+	return err == fs.ErrNotExist
 }
