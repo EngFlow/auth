@@ -43,7 +43,7 @@ var (
 		regexp.MustCompile(`^platform/linux_x64/builtin_include_directory_paths`),
 		regexp.MustCompile(`^platform/linux_x64/module.modulemap`),
 	}
-	copyrightRegexp = regexp.MustCompile(`^(#|//) Copyright [0-9-]+ EngFlow Inc\.`)
+	copyrightRegexp = regexp.MustCompile(`^(#|//|::) Copyright [0-9-]+ EngFlow Inc\.`)
 )
 
 type checkerFunc func(string) bool
