@@ -5,9 +5,9 @@ build --incompatible_strict_action_env
 
 # The {linux,macos,windows} configs are automatically enabled by Bazel depending
 # on the current platform due to --enable_platform_specific_config above.
-# Currently, there is no Windows support for building with bazel.
 build:linux --workspace_status_command=infra/get_workspace_status
 build:macos --workspace_status_command=infra/get_workspace_status
+build:windows --workspace_status_command=infra/get_workspace_status.cmd
 
 test --test_summary=testcase
 test --test_output=errors
