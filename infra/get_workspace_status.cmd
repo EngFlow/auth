@@ -28,9 +28,9 @@ echo STABLE_BUILD_RELEASE_VERSION %BUILD_RELEASE_VERSION%
 
 git diff-index --quiet HEAD --
 if %ERRORLEVEL% == 0 (
-  echo BUILD_SCM_STATUS "clean"
+  echo BUILD_SCM_STATUS clean
 ) else (
-  echo BUILD_SCM_STATUS "modified"
+  echo BUILD_SCM_STATUS modified
 )
 
 for /F %%x in ('git remote get-url origin') do set REMOTE_URL=%%x
