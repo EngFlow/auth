@@ -102,6 +102,7 @@ jobs:
   build-other-artifacts:
     runs-on:
       - self-hosted
+      - "purpose=github-actions"
       - "os=${{ matrix.os }}"
       - "arch=${{ matrix.arch }}"
       - "os_distribution=${{ matrix.os_distribution }}"
