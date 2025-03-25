@@ -373,6 +373,20 @@ func TestRun(t *testing.T) {
 			wantErr:  "fetch_token_fail",
 		},
 		{
+			desc: "login token load failure",
+			args: []string{"login", "cluster.example.com"},
+			authenticator: &fakeAuth{
+				deviceResponse: &oauth2.DeviceAuthResponse{
+					VerificationURIComplete: "https://cluster.example.com/with/auth/code",
+				},
+			},
+			keyringStore: &oauthtoken.FakeTokenStore{
+				LoadErr: errors.New("token_load_fail"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+			wantErr:  "-store=file", // error message recommends -store=file
+		},
+		{
 			desc: "login token store failure",
 			args: []string{"login", "cluster.example.com"},
 			authenticator: &fakeAuth{
@@ -627,6 +641,15 @@ func TestRun(t *testing.T) {
 			args:         []string{"import", "-store=file"},
 			machineInput: strings.NewReader(`{"token":{"access_token":"token_data"},"cluster_host":"cluster.example.com"}`),
 			keyringStore: oauthtoken.NewFakeTokenStore().WithPanic("do not call"),
+		},
+		{
+			desc: "import with keyring load failure",
+			args: []string{"login", "cluster.example.com"},
+			keyringStore: &oauthtoken.FakeTokenStore{
+				LoadErr: errors.New("token_load_fail"),
+			},
+			wantCode: autherr.CodeTokenStoreFailure,
+			wantErr:  "-store=file", // error message recommends -store=file
 		},
 	}
 	for _, tc := range testCases {

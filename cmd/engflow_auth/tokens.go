@@ -20,10 +20,33 @@ import (
 	"io/fs"
 	"os"
 
+	"github.com/EngFlow/auth/internal/autherr"
 	"github.com/EngFlow/auth/internal/oauthtoken"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 )
+
+// testKeyringBeforeStore attempts to load a token for the given hostname from
+// the encrypted keyring.
+//
+// If the file store is being used (-store=file) or if the token is missing or
+// is returned successfully, this method returns nil.
+//
+// If there's an error loading the token, this method returns an actionable
+// error, suggesting the user try -store=file.
+//
+// This should be called by commands that write the token store, before
+// the user goes through the web login flow.
+func (r *appState) testKeyringBeforeStore(hostname string) error {
+	if r.writeFileStore {
+		// Not using keyring.
+		return nil
+	}
+	if _, err := r.keyringStore.Load(hostname); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return autherr.CodedErrorf(autherr.CodeTokenStoreFailure, "failed to initialize encrypted keyring: %w\n\tNon-interactive environments typically don't support encrypted keyrings.\n\tUse -store=file to use unencrypted storage instead.", err)
+	}
+	return nil
+}
 
 // loadToken loads a token for the given cluster or returns an error equivalent
 // to fs.ErrNotExist if the token is not found in any store.

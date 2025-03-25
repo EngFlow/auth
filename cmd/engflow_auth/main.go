@@ -191,6 +191,11 @@ func (r *appState) import_(cliCtx *cli.Context) error {
 		storeURLs = append(storeURLs, clusterURL)
 	}
 
+	// Check early if the keyring works.
+	if err := r.testKeyringBeforeStore(storeURLs[0].Host); err != nil {
+		return err
+	}
+
 	var storeErrs []error
 	for _, storeURL := range storeURLs {
 		if err := r.storeToken(storeURL.Host, token.Token); err != nil {
@@ -227,6 +232,11 @@ func (r *appState) login(cliCtx *cli.Context) error {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "invalid cluster: %w", err)
 	}
 	oauthURL := oauthEndpoint(clusterURL)
+
+	// Check early if the keyring works.
+	if err := r.testKeyringBeforeStore(clusterURL.Host); err != nil {
+		return err
+	}
 
 	// Tokens fetched during the process will be associated with each URL in
 	// storeURLs in the token store
