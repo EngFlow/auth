@@ -15,6 +15,7 @@
 package oauthtoken
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"time"
@@ -53,7 +54,7 @@ func (f *FakeTokenStore) Load(cluster string) (*oauth2.Token, error) {
 	}
 	token, ok := f.Tokens[cluster]
 	if !ok {
-		return nil, fmt.Errorf("%s: token not found", cluster)
+		return nil, &tokenNotFoundError{cluster: cluster}
 	}
 	return token, nil
 }
@@ -132,4 +133,16 @@ func NewFakeTokenForSubject(subject string) *oauth2.Token {
 		TokenType:   "Bearer",
 		Expiry:      expiry,
 	}
+}
+
+type tokenNotFoundError struct {
+	cluster string
+}
+
+func (e *tokenNotFoundError) Error() string {
+	return fmt.Sprintf("%s: token not found", e.cluster)
+}
+
+func (e *tokenNotFoundError) Is(err error) bool {
+	return errors.Is(err, fs.ErrNotExist)
 }
