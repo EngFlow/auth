@@ -4,7 +4,7 @@ go 1.22.4
 
 require (
 	github.com/EngFlow/credential-helper-go v0.0.0-20240531061116-25d7df71cdb6
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.2
