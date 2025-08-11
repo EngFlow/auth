@@ -85,13 +85,13 @@ jobs:
             arch: "arm64"
             os_distribution: "sonoma"
             os_version: "14"
-            revision: "8c27ba1624955003040780ea24a0ec25a3b5e309"
+            revision: "c12cc4655257fcf7da86fe06e87542b7e6814a1f"
 
           - os: "windows"
             arch: "x64"
             os_distribution: "server"
             os_version: "2022"
-            revision: "8c27ba1624955003040780ea24a0ec25a3b5e309"
+            revision: "c12cc4655257fcf7da86fe06e87542b7e6814a1f"
 
     env:
       ARCH: "${{ matrix.arch }}"
