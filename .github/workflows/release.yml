@@ -107,7 +107,7 @@ jobs:
       - "arch=${{ matrix.arch }}"
       - "os_distribution=${{ matrix.os_distribution }}"
       - "os_version=${{ matrix.os_version }}"
-      - "revision=8c27ba1624955003040780ea24a0ec25a3b5e309"
+      - "revision=c12cc4655257fcf7da86fe06e87542b7e6814a1f"
     timeout-minutes: 10
     needs:
       - check-version
