@@ -227,6 +227,7 @@ func (r *appState) login(cliCtx *cli.Context) error {
 	ctx := cliCtx.Context
 
 	if cliCtx.Bool("insecure") {
+		fmt.Fprintf(cliCtx.App.ErrWriter, "Warning: server TLS validation is disabled\n")
 		httpClient := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
