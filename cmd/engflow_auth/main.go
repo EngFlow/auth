@@ -16,12 +16,14 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -224,6 +226,18 @@ func (r *appState) import_(cliCtx *cli.Context) error {
 func (r *appState) login(cliCtx *cli.Context) error {
 	ctx := cliCtx.Context
 
+	if cliCtx.Bool("insecure") {
+		fmt.Fprintf(cliCtx.App.ErrWriter, "Warning: server TLS validation is disabled\n")
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		}
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
+	}
+
 	if cliCtx.NArg() != 1 {
 		return autherr.CodedErrorf(autherr.CodeBadParams, "expected exactly 1 positional argument, a cluster name")
 	}
@@ -349,6 +363,10 @@ func makeApp(root *appState) *cli.App {
 		Name:  "alias",
 		Usage: "Comma-separated list of alias hostnames for this cluster",
 	}
+	insecureFlag := &cli.BoolFlag{
+		Name:  "insecure",
+		Usage: "Disable server TLS validation",
+	}
 
 	app := &cli.App{
 		Name:  "engflow_auth",
@@ -386,7 +404,7 @@ credential helper protocol.`),
 Initiates an interactive OAuth2 flow to log into the cluster at
 CLUSTER_URL.`),
 				Action: root.login,
-				Flags:  []cli.Flag{aliasFlag, storeFlag},
+				Flags:  []cli.Flag{aliasFlag, storeFlag, insecureFlag},
 			},
 			{
 				Name:      "logout",
