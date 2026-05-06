@@ -14,6 +14,7 @@
 
 """A Starlark cc_toolchain configuration rule for Windows"""
 
+load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
 load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "action_config",
@@ -28,7 +29,8 @@ load(
     "variable_with_value",
     "with_feature_set",
 )
-load("@bazel_tools//tools/build_defs/cc:action_names.bzl", "ACTION_NAMES")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/toolchains:cc_toolchain_config_info.bzl", "CcToolchainConfigInfo")
 
 all_compile_actions = [
     ACTION_NAMES.c_compile,
@@ -1394,29 +1396,29 @@ def _impl(ctx):
 cc_toolchain_config = rule(
     implementation = _impl,
     attrs = {
-        "cpu": attr.string(mandatory = True),
-        "compiler": attr.string(),
-        "toolchain_identifier": attr.string(),
-        "host_system_name": attr.string(),
-        "target_system_name": attr.string(),
-        "target_libc": attr.string(),
-        "abi_version": attr.string(),
         "abi_libc_version": attr.string(),
-        "tool_paths": attr.string_dict(),
-        "cxx_builtin_include_directories": attr.string_list(),
+        "abi_version": attr.string(),
         "archiver_flags": attr.string_list(default = []),
+        "compiler": attr.string(),
+        "cpu": attr.string(mandatory = True),
+        "cxx_builtin_include_directories": attr.string_list(),
+        "dbg_mode_debug_flag": attr.string(),
         "default_link_flags": attr.string_list(default = []),
-        "msvc_env_tmp": attr.string(default = "msvc_not_found"),
-        "msvc_env_path": attr.string(default = "msvc_not_found"),
+        "fastbuild_mode_debug_flag": attr.string(),
+        "host_system_name": attr.string(),
+        "msvc_cl_path": attr.string(default = "vc_installation_error.bat"),
         "msvc_env_include": attr.string(default = "msvc_not_found"),
         "msvc_env_lib": attr.string(default = "msvc_not_found"),
-        "msvc_cl_path": attr.string(default = "vc_installation_error.bat"),
-        "msvc_ml_path": attr.string(default = "vc_installation_error.bat"),
-        "msvc_link_path": attr.string(default = "vc_installation_error.bat"),
+        "msvc_env_path": attr.string(default = "msvc_not_found"),
+        "msvc_env_tmp": attr.string(default = "msvc_not_found"),
         "msvc_lib_path": attr.string(default = "vc_installation_error.bat"),
-        "dbg_mode_debug_flag": attr.string(),
-        "fastbuild_mode_debug_flag": attr.string(),
+        "msvc_link_path": attr.string(default = "vc_installation_error.bat"),
+        "msvc_ml_path": attr.string(default = "vc_installation_error.bat"),
+        "target_libc": attr.string(),
+        "target_system_name": attr.string(),
         "tool_bin_path": attr.string(default = "not_found"),
+        "tool_paths": attr.string_dict(),
+        "toolchain_identifier": attr.string(),
     },
     provides = [CcToolchainConfigInfo],
 )
