@@ -40,7 +40,7 @@ jobs:
       - os=linux
       - arch=x64
       - "engflow-cluster=glass"
-      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:0a8ee2164b24a0bcfffa95a071967e1495cd524a8eb52a1bcf168e52199e86b0"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
       - "engflow-runner-id=${{ github.repository_id }}_bazel-builder_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
@@ -124,7 +124,7 @@ jobs:
       - os=linux
       - arch=x64
       - "engflow-cluster=glass"
-      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:0a8ee2164b24a0bcfffa95a071967e1495cd524a8eb52a1bcf168e52199e86b0"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
       - "engflow-runner-id=${{ github.repository_id }}_golang-builder-ci-runners_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
@@ -157,7 +157,7 @@ jobs:
       - os=linux
       - arch=x64
       - "engflow-cluster=glass"
-      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:763903935682de148b4e09fe1d7ef3bbc4ec829d59c3f41cb9519984639eaa06"
+      - "engflow-container-image=docker://645088952840.dkr.ecr.eu-west-1.amazonaws.com/engflow-ci/debian12-dind-x64@sha256:0a8ee2164b24a0bcfffa95a071967e1495cd524a8eb52a1bcf168e52199e86b0"
       - "engflow-pool=ci_sysbox_x64"
       - "engflow-runtime=sysbox-runc"
       - "engflow-runner-id=${{ github.repository_id }}_copyright-headers-check_${{ github.run_id }}_${{ github.run_number }}_${{ github.run_attempt }}"
