@@ -289,6 +289,9 @@ Visit %s for help.`,
 	if err != nil {
 		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to parse authentication URL: %w", err)
 	}
+	if clusterPort := clusterURL.Port(); clusterPort != "" && verificationURL.Port() == "" {
+		verificationURL.Host = net.JoinHostPort(verificationURL.Hostname(), clusterPort)
+	}
 	if err := r.browserOpener.Open(verificationURL); err != nil {
 		return autherr.CodedErrorf(autherr.CodeAuthFailure, "failed to open browser to perform authentication: %w", err)
 	}
