@@ -82,14 +82,9 @@ fi
 chmod +x "${ENGFLOW_AUTH_PATH}"
 
 # Import the credential.
-# Use printf instead of a here-string to avoid Git Bash on Windows appending
-# \r\n, which would corrupt the token.
-printf '%s' "${CRED_HELPER_TOKEN}" | "${ENGFLOW_AUTH_PATH}" import -store=file
+"${ENGFLOW_AUTH_PATH}" import -store=file <<<"${CRED_HELPER_TOKEN}"
 
 # Configure Bazel to use the credential.
-printf "common --credential_helper=${CLUSTER_HOST}=${ENGFLOW_AUTH_PATH}\n" >.bazelrc.user
-
-echo "DO NOT SUBMIT: debug"
-if [[ "${OS}" == windows ]]; then
-  "${ENGFLOW_AUTH_PATH}" export "${CLUSTER_HOST}"
-fi
+cat >.bazelrc.user <<EOF
+common --credential_helper=${CLUSTER_HOST}=${ENGFLOW_AUTH_PATH}
+EOF
