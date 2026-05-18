@@ -82,7 +82,9 @@ fi
 chmod +x "${ENGFLOW_AUTH_PATH}"
 
 # Import the credential.
-"${ENGFLOW_AUTH_PATH}" import -store=file <<<"${CRED_HELPER_TOKEN}"
+# Use printf instead of a here-string to avoid Git Bash on Windows appending
+# \r\n, which would corrupt the token.
+printf '%s' "${CRED_HELPER_TOKEN}" | "${ENGFLOW_AUTH_PATH}" import -store=file
 
 # Configure Bazel to use the credential.
 cat >.bazelrc.user <<EOF
