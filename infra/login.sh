@@ -87,6 +87,4 @@ chmod +x "${ENGFLOW_AUTH_PATH}"
 printf '%s' "${CRED_HELPER_TOKEN}" | "${ENGFLOW_AUTH_PATH}" import -store=file
 
 # Configure Bazel to use the credential.
-cat >.bazelrc.user <<EOF
-common --credential_helper=${CLUSTER_HOST}=${ENGFLOW_AUTH_PATH}
-EOF
+printf "common --credential_helper=${CLUSTER_HOST}=${ENGFLOW_AUTH_PATH}\n" >.bazelrc.user
