@@ -39,18 +39,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Use remote execution on Linux, remote cache for others. macOS and Windows
+        # are sensitive to the C++ toolchain installed on the runner, and it may not
+        # match what's installed on the remote worker.
         include:
           - os: "linux"
             arch: "x64"
             runner: "ubuntu-latest"
+            ef_config: "engflow"
 
           - os: "macos"
             arch: "arm64"
             runner: "macos-14"
+            ef_config: "engflow_cache"
 
           - os: "windows"
             arch: "x64"
             runner: "windows-2022"
+            ef_config: "engflow_cache"
 
     env:
       ARCH: "${{ matrix.arch }}"
@@ -65,7 +71,7 @@ jobs:
       - name: "Bazel tests"
         if: success()
         run: |
-          bazel test --config=noninteractive --config=engflow --config=remote_${{ matrix.os }}_${{ matrix.arch }} //...
+          bazel test --config=noninteractive --config=${{ matrix.ef_config }} --config=remote_${{ matrix.os }}_${{ matrix.arch }} //...
 
       - name: "Go tests"
         if: success()

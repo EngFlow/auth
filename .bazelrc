@@ -58,10 +58,13 @@ build:engflow_bes --bes_results_url=https://opal.cluster.engflow.com/invocations
 build:engflow_bes --bes_instance_name=auth
 build:engflow_bes --bes_lifecycle_events
 
-build:engflow --config=engflow_common
-build:engflow --config=engflow_bes
+build:engflow_cache --config=engflow_common
+build:engflow_cache --config=engflow_bes
+build:engflow_cache --remote_cache=grpcs://opal.cluster.engflow.com
+build:engflow_cache --remote_instance_name=auth
+
+build:engflow --config=engflow_cache
 build:engflow --remote_executor=grpcs://opal.cluster.engflow.com
-build:engflow --remote_instance_name=auth
 
 # To authenticate with the clusters above, either add flags to this
 # .bazelrc.user file or to your $HOME/.bazelrc. These files may contain
