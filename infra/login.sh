@@ -88,3 +88,8 @@ printf '%s' "${CRED_HELPER_TOKEN}" | "${ENGFLOW_AUTH_PATH}" import -store=file
 
 # Configure Bazel to use the credential.
 printf "common --credential_helper=${CLUSTER_HOST}=${ENGFLOW_AUTH_PATH}\n" >.bazelrc.user
+
+echo "DO NOT SUBMIT: debug"
+if [[ "${OS}" == windows ]]; then
+  "${ENGFLOW_AUTH_PATH}" export "${CLUSTER_HOST}"
+fi
