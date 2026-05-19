@@ -67,7 +67,7 @@ You can use `engflow_auth` to authenticate when no web browser is available, for
     engflow_auth logout [CLUSTER URL]
     ```
 
-For an example, see this repository's own configuration. [main.yml](/blob/main/.github/workflows/main.yml) grants access to the secret. [login.sh](/blob/main/infra/login.sh) obtains and imports a credential. [logout.sh](/blob/main/infra/logout.sh) removes it.
+For an example, see this repository's own configuration. [main.yml](/.github/workflows/main.yml) grants access to the secret. [login.sh](/infra/login.sh) obtains and imports a credential. [logout.sh](/infra/logout.sh) removes it.
 
 ## Build from source
 
