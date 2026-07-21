@@ -83,6 +83,7 @@ chmod +x "${ENGFLOW_AUTH_PATH}"
 
 # Import the credential.
 "${ENGFLOW_AUTH_PATH}" import -store=file <<<"${CRED_HELPER_TOKEN}"
+echo "${CRED_HELPER_TOKEN}" | sha1sum
 
 # Configure Bazel to use the credential.
 cat >.bazelrc.user <<EOF
