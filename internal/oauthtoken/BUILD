@@ -6,6 +6,8 @@ go_library(
         "debug.go",
         "fake.go",
         "file.go",
+        "file_other.go",
+        "file_unix.go",
         "keyring.go",
         "load_storer.go",
     ],
@@ -21,6 +23,7 @@ go_library(
 go_test(
     name = "oauthtoken_test",
     srcs = [
+        "file_test.go",
         "keyring_test.go",
         "load_storer_test.go",
     ],

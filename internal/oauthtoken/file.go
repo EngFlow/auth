@@ -36,13 +36,56 @@ type FileStore struct {
 var _ LoadStorer = (*FileStore)(nil)
 
 func NewFileTokenStore(dir string) (*FileStore, error) {
-	if err := os.MkdirAll(filepath.Dir(dir), 0777); err != nil {
+	// Create parent directories with restrictive permissions (0700) rather
+	// than 0777. Go applies these bits before the process umask, so a
+	// permissive umask with 0777 could leave parents writable by other local
+	// users, enabling path-replacement attacks on a shared host.
+	if err := os.MkdirAll(filepath.Dir(dir), 0700); err != nil {
 		return nil, fmt.Errorf("creating parent of token directory: %w", err)
 	}
-	if err := os.Mkdir(dir, 0700); err != nil && !errors.Is(err, fs.ErrExist) {
-		return nil, fmt.Errorf("creating token directory: %w", err)
+	if err := os.Mkdir(dir, 0700); err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			return nil, fmt.Errorf("creating token directory: %w", err)
+		}
+		// The path already exists. Do not blindly trust it: another local
+		// user could have pre-created a symbolic link or other object at this
+		// path to redirect or observe subsequent token-file operations.
+		// Verify it is a real directory owned by us and not accessible to
+		// group or other users.
+		if err := checkTokenDir(dir); err != nil {
+			return nil, fmt.Errorf("validating existing token directory: %w", err)
+		}
 	}
 	return &FileStore{dir: dir}, nil
+}
+
+// checkTokenDir verifies that the token directory at dir is a regular
+// directory (not a symbolic link or other filesystem object), is owned by the
+// current user, and is not writable by group or other users. Group/other
+// write access is what would allow another local user to replace the
+// directory or its contents; token files themselves are written with mode
+// 0600.
+func checkTokenDir(dir string) error {
+	// Use Lstat so that a symbolic link is reported as a symlink rather than
+	// followed to its target.
+	info, err := os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	mode := info.Mode()
+	if mode&fs.ModeSymlink != 0 {
+		return fmt.Errorf("%q is a symbolic link, not a directory", dir)
+	}
+	if !mode.IsDir() {
+		return fmt.Errorf("%q is not a directory", dir)
+	}
+	if perm := mode.Perm(); perm&0022 != 0 {
+		return fmt.Errorf("%q is writable by group or other users (mode %o)", dir, perm)
+	}
+	if err := checkOwnedByCurrentUser(dir, info); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (f *FileStore) Load(cluster string) (_ *oauth2.Token, err error) {
