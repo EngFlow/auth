@@ -22,6 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 )
 
 func TestNewFileTokenStore(t *testing.T) {
@@ -82,4 +83,71 @@ func TestNewFileTokenStore(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "writable")
 	})
+}
+
+// traversalKeys are cluster identifiers that must never be allowed to resolve
+// to a path outside the token store directory. These mirror the values a
+// malicious cluster URL or import blob can produce (see sanitizedURL, which
+// moves a bare relative value into the URL host).
+var traversalKeys = []string{
+	"../../../../../escaped/token",
+	"..",
+	".",
+	"",
+	"sub/token",
+	"a/../../b",
+	"/etc/passwd",
+	"/absolute/path",
+}
+
+func TestFileStoreRejectsPathTraversal(t *testing.T) {
+	// A sentinel file living next to the store directory stands in for any
+	// user-accessible file an attacker might try to read, overwrite, or delete.
+	base := t.TempDir()
+	dir := filepath.Join(base, "tokens")
+	store, err := NewFileTokenStore(dir)
+	require.NoError(t, err)
+
+	sentinelRel := filepath.Join("..", "sentinel")
+	sentinelPath := filepath.Join(dir, sentinelRel)
+	const sentinelContent = "important-user-data"
+
+	for _, key := range traversalKeys {
+		t.Run(key, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(sentinelPath, []byte(sentinelContent), 0600))
+
+			_, loadErr := store.Load(key)
+			require.Error(t, loadErr, "Load must reject traversal key")
+
+			storeErr := store.Store(key, &oauth2.Token{AccessToken: "attacker-controlled"})
+			require.Error(t, storeErr, "Store must reject traversal key")
+
+			deleteErr := store.Delete(key)
+			require.Error(t, deleteErr, "Delete must reject traversal key")
+
+			// The sentinel file must be untouched by any of the operations.
+			got, err := os.ReadFile(sentinelPath)
+			require.NoError(t, err, "sentinel file must still exist")
+			assert.Equal(t, sentinelContent, string(got), "sentinel file must be unmodified")
+		})
+	}
+}
+
+func TestTokenFileName(t *testing.T) {
+	// Legitimate cluster hosts (with or without a port) are single path
+	// elements and must pass through unchanged for backwards compatibility.
+	for _, valid := range []string{
+		"nakatomiplaza.cluster.engflow.com",
+		"cluster.example.com",
+		"cluster.example.com:8080",
+	} {
+		name, err := tokenFileName(valid)
+		require.NoErrorf(t, err, "expected %q to be accepted", valid)
+		assert.Equal(t, valid, name)
+	}
+
+	for _, invalid := range traversalKeys {
+		_, err := tokenFileName(invalid)
+		assert.Errorf(t, err, "expected %q to be rejected", invalid)
+	}
 }

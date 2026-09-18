@@ -21,6 +21,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/oauth2"
 )
@@ -95,7 +96,17 @@ func (f *FileStore) Load(cluster string) (_ *oauth2.Token, err error) {
 		}
 	}()
 
-	data, err := os.ReadFile(f.tokenFilePath(cluster))
+	name, err := tokenFileName(cluster)
+	if err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(f.dir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	data, err := root.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
@@ -113,15 +124,35 @@ func (f *FileStore) Store(cluster string, token *oauth2.Token) (err error) {
 		}
 	}()
 
+	name, err := tokenFileName(cluster)
+	if err != nil {
+		return err
+	}
 	data, err := json.Marshal(token)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(f.tokenFilePath(cluster), data, 0600)
+	root, err := os.OpenRoot(f.dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	return root.WriteFile(name, data, 0600)
 }
 
 func (f *FileStore) Delete(cluster string) error {
-	if err := os.Remove(f.tokenFilePath(cluster)); errors.Is(err, fs.ErrNotExist) {
+	name, err := tokenFileName(cluster)
+	if err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(f.dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+
+	if err := root.Remove(name); errors.Is(err, fs.ErrNotExist) {
 		return err
 	} else if err != nil {
 		return fmt.Errorf("removing token for cluster %q: %w", cluster, err)
@@ -129,6 +160,27 @@ func (f *FileStore) Delete(cluster string) error {
 	return nil
 }
 
-func (f *FileStore) tokenFilePath(cluster string) string {
-	return filepath.Join(f.dir, cluster)
+// tokenFileName validates that a cluster key can be used directly as the name
+// of a token file within the store directory, and returns that name.
+//
+// Token files have always been named after the (bare host) cluster key, one
+// file per cluster directly inside the store directory. A legitimate host —
+// with or without a port — is a single path element and passes unchanged, so
+// existing token files remain readable. Any key that would resolve to a
+// different directory (because it contains a path separator, a ".." segment,
+// is absolute, or is otherwise not a single "clean" path element) is rejected.
+//
+// This is the first line of defense; os.Root additionally enforces containment
+// at the operating-system level for every read, write, and delete, so a key
+// that slipped past this check still cannot escape the store directory.
+func tokenFileName(cluster string) (string, error) {
+	if cluster == "" ||
+		cluster == "." ||
+		cluster == ".." ||
+		strings.ContainsRune(cluster, '/') ||
+		strings.ContainsRune(cluster, filepath.Separator) ||
+		filepath.Clean(cluster) != cluster {
+		return "", fmt.Errorf("invalid cluster identifier %q: must be a single path element", cluster)
+	}
+	return cluster, nil
 }
