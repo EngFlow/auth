@@ -65,7 +65,7 @@ jobs:
 
           - os: "macos"
             arch: "arm64"
-            runner: "macos-14"
+            runner: "macos-26"
 
           - os: "windows"
             arch: "x64"
