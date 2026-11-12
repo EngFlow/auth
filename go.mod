@@ -1,6 +1,6 @@
 module github.com/EngFlow/auth
 
-go 1.25.0
+go 1.26.4
 
 require (
 	github.com/EngFlow/credential-helper-go v0.0.0-20260320063250-1f92d5f713f4
