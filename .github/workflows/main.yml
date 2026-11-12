@@ -51,7 +51,7 @@ jobs:
 
           - os: "macos"
             arch: "arm64"
-            runner: "macos-14"
+            runner: "macos-26"
             ef_config: "engflow_cache"
 
           - os: "windows"
@@ -64,7 +64,7 @@ jobs:
       OS: "${{ matrix.os }}"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: "Log in"
         shell: bash
@@ -96,7 +96,7 @@ jobs:
       OS: "linux"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Log in
         run: infra/login.sh
